@@ -59,12 +59,12 @@ export const VisualConfig = {
         }
     },
     GEOBOUNDARIES: {
-        BASE_URL: "https://cdn.jsdelivr.net/gh/IM4SEA/geoboundaries-lite",
+        BASE_URL: "https://cdn.jsdelivr.net/gh/maplumi/geoboundaries-lite",
         // Manifest of available countries and admin levels for the lightweight catalog
-    MANIFEST_URL: "https://cdn.jsdelivr.net/gh/IM4SEA/geoboundaries-lite@v2025-11/data/index.json",
+    MANIFEST_URL: "https://cdn.jsdelivr.net/gh/maplumi/geoboundaries-lite@v2025-11/data/index.json",
     // URL returning a JSON array of available dataset tags (e.g. ["v2025-09","v2025-10","v2025-11"]).
-    TAGS_URL: "https://raw.githubusercontent.com/IM4SEA/geoboundaries-lite/refs/heads/master/data/tags.json",
-        ALL_COUNTRIES_URL: "https://cdn.jsdelivr.net/gh/IM4SEA/geoboundaries-lite@v2025-11/data/ALL/geoBoundariesCGAZ_ADM0.topojson",
+    TAGS_URL: "https://raw.githubusercontent.com/maplumi/geoboundaries-lite/refs/heads/master/data/tags.json",
+        ALL_COUNTRIES_URL: "https://cdn.jsdelivr.net/gh/maplumi/geoboundaries-lite@v2025-11/data/ALL/geoBoundariesCGAZ_ADM0.topojson",
         // Minimal fallback list used only if manifest fetch has not populated catalog yet.
         // The dynamic manifest will replace this with the full country list.
     COUNTRIES: countries,
