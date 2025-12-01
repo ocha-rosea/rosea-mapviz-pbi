@@ -3,7 +3,24 @@
 import type powerbi from "powerbi-visuals-api";
 import { RoleNames } from "../constants/roles";
 
+/**
+ * Service for working with Power BI data roles and categorical data.
+ * Provides utilities for checking role presence, extracting values,
+ * and computing auto-toggle states for layers.
+ * 
+ * @example
+ * ```typescript
+ * const hasLatLon = DataRoleService.hasRoleWithValues(categorical, 'Latitude');
+ * const token = DataRoleService.getFirstStringValueForRole(categorical, 'MapboxAccessToken');
+ * const toggles = DataRoleService.computeAutoToggles(categorical);
+ * ```
+ */
 export class DataRoleService {
+    /**
+     * Checks if a value is non-null, non-undefined, and non-empty.
+     * @param v - Value to check
+     * @returns true if the value is considered "present"
+     */
     static hasNonEmptyValue(v: any): boolean {
         if (v === null || v === undefined) return false;
         if (typeof v === "string") return v.trim().length > 0;
@@ -11,11 +28,24 @@ export class DataRoleService {
         return true;
     }
 
+    /**
+     * Checks if a data role has any non-empty values in the categorical data.
+     * @param categorical - Power BI categorical data view
+     * @param roleName - Name of the data role to check
+     * @returns true if the role exists and has at least one non-empty value
+     */
     static hasRoleWithValues(categorical: powerbi.DataViewCategorical, roleName: string): boolean {
         const cat = categorical.categories?.find(c => c.source?.roles && (c.source.roles as any)[roleName]);
         return !!(cat && Array.isArray(cat.values) && cat.values.length > 0 && cat.values.some(this.hasNonEmptyValue));
     }
 
+    /**
+     * Extracts the first non-empty string value for a given data role.
+     * Searches both categories and values columns.
+     * @param categorical - Power BI categorical data view
+     * @param roleName - Name of the data role to search
+     * @returns The first non-empty trimmed string value, or undefined
+     */
     static getFirstStringValueForRole(categorical: powerbi.DataViewCategorical | undefined, roleName: string): string | undefined {
         if (!categorical) {
             return undefined;

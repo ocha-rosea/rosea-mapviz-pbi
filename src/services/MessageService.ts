@@ -3,9 +3,24 @@
 import powerbi from "powerbi-visuals-api";
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
+/**
+ * Service for displaying warning and informational messages to users.
+ * Uses Power BI's built-in warning icon display mechanism.
+ * 
+ * @example
+ * ```typescript
+ * const messageService = new MessageService(host);
+ * messageService.missingMeasures();
+ * messageService.geoBoundariesConfigError('Invalid country code');
+ * ```
+ */
 export class MessageService {
     private host: IVisualHost;
 
+    /**
+     * Creates a new MessageService instance.
+     * @param host - The Power BI visual host for displaying warnings
+     */
     constructor(host: IVisualHost) {
         this.host = host;
     }

@@ -317,8 +317,10 @@ export abstract class BaseOrchestrator<TOptions, TLayer extends IMapLayer> {
 
 ## Quick Wins (Can Start Immediately)
 
-1. **Fix typo:** `proportalCircles` → `proportionalCircles` throughout codebase
-2. **Extract constants:** Move magic numbers to `constants/defaults.ts`
+1. ✅ **Fix typo:** `proportalCircles` → `proportionalCircles` throughout codebase - DONE (commit d4e7589)
+2. ✅ **Extract constants:** Move magic numbers to `constants/defaults.ts` - DONE (commit d4e7589)
+   - Created `src/constants/defaults.ts` with organized default values
+   - ProportionalCirclesDefaults, ChoroplethDefaults, LegendContainerDefaults, etc.
 3. **Add JSDoc comments:** Document public APIs in services
 4. **Create type guards:** Add runtime type validation for external data
 5. **Consolidate imports:** Create barrel exports for each directory
@@ -343,6 +345,17 @@ export abstract class BaseOrchestrator<TOptions, TLayer extends IMapLayer> {
 3. [ ] Migrate one settings group at a time with tests
 4. [ ] Ensure build passes after each migration
 5. [ ] Update imports in visual.ts progressively
+
+---
+
+## Completed Work Log
+
+### Quick Wins - Completed 2024
+
+- **Commit d4e7589**: Fixed `proportalCircles` → `proportionalCircles` typo in settings.ts and OptionsService.ts
+- **Commit d4e7589**: Created `src/constants/defaults.ts` with extracted magic numbers
+  - Build verified: `pbiviz package` SUCCESS
+  - Tests verified: 64 suites, 210 tests PASSED
 
 ---
 

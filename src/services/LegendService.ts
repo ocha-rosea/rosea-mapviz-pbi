@@ -3,22 +3,54 @@ import * as format from "../utils/format";
 import { ClassificationMethods, LegendOrientations, LegendLabelPositions } from "../constants/strings";
 import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 
+/**
+ * Represents a legend entry for circle measure categories.
+ */
 export interface CircleMeasureLegendEntry {
+    /** Display name for the legend entry */
     name: string;
+    /** Fill color in hex format */
     color: string;
+    /** Optional opacity value (0-1) */
     opacity?: number;
 }
 
+/**
+ * Service responsible for rendering map legends for both choropleth and scaled circles.
+ * Creates SVG-based legends with proper sizing, styling, and layout.
+ * 
+ * @example
+ * ```typescript
+ * const legendService = new LegendService(legendContainer);
+ * legendService.createProportionalCircleLegend(sizes, radii, 2, circleOptions);
+ * legendService.createChoroplethLegend(breaks, colors, choroplethOptions);
+ * ```
+ */
 export class LegendService {
 
     private mainContainer: HTMLElement;
     private circleLegendContainer: HTMLElement | null = null;
     private choroplethLegendContainer: HTMLElement | null = null;
 
+    /**
+     * Creates a new LegendService instance.
+     * @param container - The HTML element to render legends into
+     */
     constructor(container: HTMLElement) {
         this.mainContainer = container;
     }
 
+    /**
+     * Creates a proportional/scaled circles legend with nested circles.
+     * Displays min, median, and max values with appropriate sizing.
+     * @param sizeValues - Array of data values for size scaling
+     * @param radii - Pre-calculated radii for each legend circle
+     * @param numberofCircleCategories - Number of circle measure categories (1 or 2)
+     * @param circleOptions - Styling and display options from formatting pane
+     * @param formatTemplate - Python-style format string for labels (default: "{:.0f}")
+     * @param customLabels - Optional custom labels to override calculated values
+     * @param measureLegendEntries - Optional measure category legend entries for multi-measure
+     */
     createProportionalCircleLegend(
         sizeValues: number[],
         radii: number[],

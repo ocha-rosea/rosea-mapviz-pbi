@@ -19,6 +19,17 @@ import { ZoomControlManager } from "./ZoomControlManager";
 import { defaults as defaultInteractions } from 'ol/interaction';
 
 
+/**
+ * Service responsible for managing the OpenLayers map instance.
+ * Handles basemap configuration, view state, and map controls.
+ * 
+ * @example
+ * ```typescript
+ * const mapService = new MapService(container, true, host);
+ * mapService.updateBasemap(basemapOptions);
+ * const olMap = mapService.getMap();
+ * ```
+ */
 export class MapService {
     private map: Map;
     private state: MapState;
@@ -29,6 +40,12 @@ export class MapService {
     private host: any; // Add host property for debugging
     private view: View;
 
+    /**
+     * Creates a new MapService instance.
+     * @param container - The HTML element to render the map into
+     * @param showZoomControl - Whether to display zoom controls (default: true)
+     * @param host - Optional Power BI visual host for debugging
+     */
     constructor(container: HTMLElement, showZoomControl: boolean = true, host?: any) {
 
         this.container = container;
@@ -72,6 +89,11 @@ export class MapService {
         };
     }
 
+    /**
+     * Updates the basemap layer based on the provided options.
+     * Handles Mapbox, MapTiler, OpenStreetMap, and custom basemap sources.
+     * @param options - Basemap configuration options including style and attribution
+     */
     public updateBasemap(options: any): void {
         
         const { selectedBasemap, customMapAttribution } = options;
@@ -128,22 +150,42 @@ export class MapService {
         }
     }
 
+    /**
+     * Returns the underlying OpenLayers Map instance.
+     * @returns The OpenLayers Map object
+     */
     public getMap(): Map {
         return this.map;
     }
 
+    /**
+     * Returns the map's View instance for controlling center, zoom, and extent.
+     * @returns The OpenLayers View object
+     */
     public getView(): View {
         return this.view;
     }
 
+    /**
+     * Returns the current map state including basemap type and attribution.
+     * @returns Current MapState object
+     */
     public getState(): MapState {
         return this.state;
     }
 
+    /**
+     * Updates the map state with new values.
+     * @param newState - Partial MapState to merge with current state
+     */
     public setState(newState: Partial<MapState>): void {
         this.state = { ...this.state, ...newState };
     }
 
+    /**
+     * Cleans up map resources and removes the map from the DOM.
+     * Should be called when the visual is destroyed.
+     */
     public destroy(): void {
         if (this.map) {
             this.map.setTarget(null);

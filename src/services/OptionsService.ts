@@ -3,6 +3,16 @@
 import { RoseaMapVizFormattingSettingsModel } from "../settings";
 import { BasemapOptions, ChoroplethOptions, CircleOptions, MapToolsOptions } from "../types";
 
+/**
+ * Service that converts Power BI formatting settings model into typed option objects.
+ * Acts as an adapter between the Power BI formatting pane and the visual's internal APIs.
+ * 
+ * @example
+ * ```typescript
+ * const basemapOpts = OptionsService.getBasemapOptions(formattingModel);
+ * const circleOpts = OptionsService.getCircleOptions(formattingModel);
+ * ```
+ */
 export class OptionsService {
     private static toString(value: unknown, trim: boolean = false): string {
         if (value === null || value === undefined) {
@@ -20,6 +30,12 @@ export class OptionsService {
         return this.toString(fallbackValue, true);
     }
 
+    /**
+     * Extracts basemap configuration from the formatting model.
+     * @param model - The Power BI formatting settings model
+     * @param overrides - Optional credential overrides from data roles
+     * @returns Typed BasemapOptions for MapService consumption
+     */
     static getBasemapOptions(
         model: RoseaMapVizFormattingSettingsModel,
         overrides?: Partial<Pick<BasemapOptions, "mapboxAccessToken" | "maptilerApiKey">>
@@ -37,6 +53,12 @@ export class OptionsService {
         };
     }
 
+    /**
+     * Extracts map controls configuration from the formatting model.
+     * Includes render engine, zoom controls, and legend container settings.
+     * @param model - The Power BI formatting settings model
+     * @returns Typed MapToolsOptions for visual configuration
+     */
     static getMapToolsOptions(model: RoseaMapVizFormattingSettingsModel): MapToolsOptions {
         const maptoolsSettings = model.mapControlsVisualCardSettings;
         return {
@@ -58,6 +80,12 @@ export class OptionsService {
         };
     }
 
+    /**
+     * Extracts scaled/proportional circles configuration from the formatting model.
+     * Includes display settings, legend options, and scaling parameters.
+     * @param model - The Power BI formatting settings model
+     * @returns Typed CircleOptions for CircleOrchestrator consumption
+     */
     static getCircleOptions(model: RoseaMapVizFormattingSettingsModel): CircleOptions {
         const circleSettings = model.ProportionalCirclesVisualCardSettings;
         return {
@@ -90,6 +118,12 @@ export class OptionsService {
         };
     }
 
+    /**
+     * Extracts choropleth map configuration from the formatting model.
+     * Includes boundary source, classification method, color ramp, and legend settings.
+     * @param model - The Power BI formatting settings model
+     * @returns Typed ChoroplethOptions for ChoroplethOrchestrator consumption
+     */
     static getChoroplethOptions(model: RoseaMapVizFormattingSettingsModel): ChoroplethOptions {
         const choroplethSettings = model.ChoroplethVisualCardSettings;
         const choroplethDisplaySettings = choroplethSettings.choroplethDisplaySettingsGroup;
