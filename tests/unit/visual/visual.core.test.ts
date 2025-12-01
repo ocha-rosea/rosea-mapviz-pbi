@@ -46,8 +46,10 @@ describe('RoseaMapViz core', () => {
     expect(fm).toBeTruthy();
   });
 
-  it('persists map extent via private method', () => {
-    (visual as any).persistCurrentExtentAsLocked('1,2,3,4', 7);
+  it('persists map extent via stateManager', () => {
+    // Access the stateManager and call persistLockedExtent
+    const stateManager = (visual as any).stateManager;
+    stateManager.persistLockedExtent('1,2,3,4', 7);
     expect(host.persistProperties).toHaveBeenCalled();
   });
 });

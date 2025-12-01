@@ -37,154 +37,98 @@ import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
-import { MessageService } from "./services/MessageService";
+import { MessageService, DOMManager, StateManager } from "./services";
 
 import { RoseaMapVizFormattingSettingsModel } from "./settings"; import "ol/ol.css";
 import Map from "ol/Map";
-import { BasemapOptions, ChoroplethOptions, CircleOptions, MapToolsOptions } from "./types/index";
+import { MapToolsOptions } from "./types/index";
 import type { CircleLayer } from "./layers/circleLayer";
 import type { ChoroplethLayer } from "./layers/choroplethLayer";
 import type { CircleCanvasLayer } from "./layers/canvas/circleCanvasLayer";
 import type { ChoroplethCanvasLayer } from "./layers/canvas/choroplethCanvasLayer";
 import * as d3 from "d3";
-import { LegendService } from "./services/LegendService";
-import { MapService } from "./services/MapService";
-import { ChoroplethDataService } from "./services/ChoroplethDataService";
-import { ColorRampManager } from "./services/ColorRampManager";
-import type { Extent } from "ol/extent";
-import { VisualConfig } from "./config/VisualConfig";
-import { CacheService } from "./services/CacheService";
-import { MapToolsOrchestrator } from "./orchestration/MapToolsOrchestrator";
+import { LegendService, MapService, ChoroplethDataService, ColorRampManager, CacheService, OptionsService, ColorRampHelper, DataRoleService, GeoBoundariesCatalogService } from "./services";
 import { View } from "ol";
+import { MapToolsOrchestrator } from "./orchestration/MapToolsOrchestrator";
 import { ChoroplethOrchestrator } from "./orchestration/ChoroplethOrchestrator";
 import { CircleOrchestrator } from "./orchestration/CircleOrchestrator";
-import { OptionsService } from "./services/OptionsService";
-import { ColorRampHelper } from "./services/ColorRampHelper";
-import { DataRoleService } from "./services/DataRoleService";
-import { DomIds, LegendPositions, VisualObjectNames, VisualObjectProps } from "./constants/strings";
+import { DomIds } from "./constants/strings";
 import { RoleNames } from "./constants/roles";
 import { isWebGLAvailable } from "./utils/render";
-import { GeoBoundariesCatalogService } from "./services/GeoBoundariesCatalogService";
-export class RoseaMapViz implements IVisual {
 
+export class RoseaMapViz implements IVisual {
     private host: IVisualHost;
     private formattingSettingsService: FormattingSettingsService;
     private visualFormattingSettingsModel: RoseaMapVizFormattingSettingsModel;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
     private selectionManager: ISelectionManager;
+    
+    // DOM Management
+    private domManager: DOMManager;
+    private stateManager: StateManager;
     private container: HTMLElement;
-    private svgContainer: HTMLElement;
-    private legendContainer: HTMLElement;
+    private svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
+    
+    // Services
     private colorRampManager: ColorRampManager;
     private legendService: LegendService;
     private mapService: MapService;
     private dataService: ChoroplethDataService;
-    private svgOverlay: SVGSVGElement;
-    private svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
+    private cacheService: CacheService;
+    private messages: MessageService;
+    
+    // Map
     private map: Map;
     private view: View;
     private mapToolsOptions: MapToolsOptions;
+    
+    // Layers
     private circleLayer: CircleLayer | CircleCanvasLayer;
     private choroplethLayer: ChoroplethLayer | ChoroplethCanvasLayer;
-   
     private choroplethDisplayed: boolean = false;
-    private cacheService: CacheService;
     
-    // Auto-toggle removed: layers are user-driven via format pane toggles
+    // Orchestrators
     private events: IVisualEventService;
-    
-    private previousLockMapExtent: boolean | undefined;
     private mapToolsOrchestrator: MapToolsOrchestrator;
     private circleOrchestrator: CircleOrchestrator;
     private choroplethOrchestrator: ChoroplethOrchestrator;
-    private messages: MessageService;
 
     constructor(options: VisualConstructorOptions) {
-
         this.host = options.host;
         this.events = options.host.eventService;
-    this.messages = new MessageService(options.host);
-
-        // Opt-in cache debug logging: enable via DevTools, localStorage, or URL query
-        try {
-            const already = (globalThis as any).__ROSEA_MAPVIZ_DEBUG_CACHE__ === true;
-            const byLocalStorage = typeof localStorage !== 'undefined' && localStorage.getItem('roseamapviz:debugCache') === '1';
-            const byQuery = typeof location !== 'undefined' && /(^|[?&])debugCache=1(&|$)/.test(location.search || '');
-            if (!already && (byLocalStorage || byQuery)) {
-                (globalThis as any).__ROSEA_MAPVIZ_DEBUG_CACHE__ = true;
-            }
-        } catch { /* ignore */ }
-
+        this.container = options.element;
+        
+        // Initialize state manager (handles debug settings)
+        this.stateManager = new StateManager({ host: this.host });
+        this.messages = new MessageService(this.host);
+        
+        // Initialize formatting
         this.formattingSettingsService = new FormattingSettingsService();
         this.visualFormattingSettingsModel = new RoseaMapVizFormattingSettingsModel();
-
+        
+        // Initialize Power BI services
         this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService);
         this.selectionManager = this.host.createSelectionManager();
-
-        this.container = options.element;
-
-        //legend container
-    this.legendContainer = document.createElement("div");
-    this.legendContainer.setAttribute("id", DomIds.LegendContainer);
-        this.legendContainer.style.position = "absolute";
-        this.legendContainer.style.zIndex = "1000";
-        this.legendContainer.style.display = "none"; // Hidden by default
-
-        this.legendContainer.style.pointerEvents = 'none';
-
-        this.container.appendChild(this.legendContainer);
-
-        this.legendService = new LegendService(this.legendContainer);
-
+        
+        // Initialize DOM Manager and create DOM elements
+        this.domManager = new DOMManager({ container: this.container });
+        const elements = this.domManager.getElements();
+        
+        // Initialize legend service
+        this.legendService = new LegendService(elements.legendContainer);
+        
+        // Initialize map
         this.mapService = new MapService(this.container, this.mapToolsOptions?.showZoomControl !== false, this.host);
         this.map = this.mapService.getMap();
         this.view = this.mapService.getView();
         this.mapToolsOrchestrator = new MapToolsOrchestrator(this.map, this.mapService);
-
-        // svg layer overlay
-        this.svgOverlay = this.container.querySelector('svg');
-        if (!this.svgOverlay) {
-            this.svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            this.svgOverlay.id = DomIds.SvgOverlay;
-            this.svgOverlay.style.position = 'absolute';
-            this.svgOverlay.style.top = '0';
-            this.svgOverlay.style.left = '0';
-            this.svgOverlay.style.width = '100%';
-            this.svgOverlay.style.height = '100%';
-            // Let the map handle pan/zoom; hit-layer shapes explicitly enable pointer-events.
-            this.svgOverlay.style.pointerEvents = 'none';
-        }
-
-        this.svg = d3.select(this.svgOverlay);
-        // Container that holds our overlay elements (SVG and any canvases)
-        this.svgContainer = document.createElement('div');
-        this.svgContainer.style.position = 'absolute';
-        this.svgContainer.style.top = '0';
-        this.svgContainer.style.left = '0';
-        this.svgContainer.style.width = '100%';
-        this.svgContainer.style.height = '100%';
-    // Let the map receive pan/zoom events; individual hit shapes enable pointer-events themselves.
-    this.svgContainer.style.pointerEvents = 'none';
-    this.svgContainer.style.zIndex = '100';
-
-        // Ensure the overlay elements are mounted in the DOM so Canvas/SVG are visible above the map
-        // (OpenLayers will also move this container into its layer element when rendering.)
-        this.svgContainer.appendChild(this.svgOverlay);
-        if (!this.container.contains(this.svgContainer)) {
-            this.container.appendChild(this.svgContainer);
-        }
-
-        // Ensure legend container is part of DOM
-        if (!this.legendContainer.parentElement) {
-            this.container.appendChild(this.legendContainer);
-        }
-
+        
+        // Get D3 selection from DOM manager's SVG
+        this.svg = d3.select(elements.svgOverlay);
+        
         // Subscribe to selection changes
         this.selectionManager.registerOnSelectCallback(() => {
-
             const selectionIds = this.selectionManager.getSelectionIds();
-
-            // Update both layers if they exist
             if (this.circleOrchestrator) {
                 this.circleOrchestrator.setSelectedIds(selectionIds as any);
                 this.circleLayer?.changed();
@@ -194,16 +138,16 @@ export class RoseaMapViz implements IVisual {
                 this.choroplethLayer?.changed();
             }
         });
-
+        
+        // Initialize cache and prefetch catalog
         this.cacheService = new CacheService();
-    // Prefetch GeoBoundaries catalog in background; UI uses sync cache-backed lists
-    try { GeoBoundariesCatalogService.getCatalog().catch(() => {}); } catch {}
-
-        // Instantiate orchestrators after svg and services are ready
+        try { GeoBoundariesCatalogService.getCatalog().catch(() => {}); } catch {}
+        
+        // Initialize orchestrators
         this.circleOrchestrator = new CircleOrchestrator({
             svg: this.svg as unknown as d3.Selection<SVGElement, unknown, HTMLElement, any>,
-            svgOverlay: this.svgOverlay,
-            svgContainer: this.svgContainer,
+            svgOverlay: elements.svgOverlay,
+            svgContainer: elements.svgContainer,
             legendService: this.legendService,
             host: this.host,
             map: this.map,
@@ -212,8 +156,8 @@ export class RoseaMapViz implements IVisual {
         });
         this.choroplethOrchestrator = new ChoroplethOrchestrator({
             svg: this.svg as unknown as d3.Selection<SVGElement, unknown, HTMLElement, any>,
-            svgOverlay: this.svgOverlay,
-            svgContainer: this.svgContainer,
+            svgOverlay: elements.svgOverlay,
+            svgContainer: elements.svgContainer,
             legendService: this.legendService,
             host: this.host,
             map: this.map,
@@ -223,26 +167,17 @@ export class RoseaMapViz implements IVisual {
         });
     }
 
-    // Centralized overlay visibility: show overlay only when at least one layer provides visible content
     private updateOverlayVisibility(): void {
-        try {
-            // If either layer exists and has visible content, show the overlay
-            const choroplethHasFeatures = !!this.choroplethLayer && typeof (this.choroplethLayer as any).getFeaturesExtent === 'function' && (this.choroplethLayer as any).getFeaturesExtent?.();
-            const circleHasFeatures = !!this.circleLayer && typeof (this.circleLayer as any).getFeaturesExtent === 'function' && (this.circleLayer as any).getFeaturesExtent?.();
-            // Also consider canvas fallbacks: check for canvas elements in svgContainer
-            const hasChoroplethCanvas = !!this.svgContainer.querySelector('#choropleth-canvas');
-            const hasCirclesCanvas = !!this.svgContainer.querySelector('#circles-canvas');
-
-            const shouldShow = !!choroplethHasFeatures || !!circleHasFeatures || hasChoroplethCanvas || hasCirclesCanvas;
-            this.svgOverlay.style.display = shouldShow ? 'block' : 'none';
-        } catch (e) {
-            try { this.svgOverlay.style.display = 'none'; } catch {}
-        }
-        // Optional debug dump when enabled
+        this.domManager.updateOverlayVisibility(
+            this.choroplethLayer as any,
+            this.circleLayer as any
+        );
     }
 
     public update(options: VisualUpdateOptions) {
         this.events.renderingStarted(options);
+        const elements = this.domManager.getElements();
+        
         try {
             const dataView = options.dataViews[0];
             this.map.setView(this.view); // default view
@@ -278,7 +213,7 @@ export class RoseaMapViz implements IVisual {
 
             // Clean up previous overlay graphics (never touch base map layer stack here)
             this.svg.selectAll('*').remove();
-            this.svgOverlay.style.display = 'none';
+            elements.svgOverlay.style.display = 'none';
 
             // Build option objects
             const basemapOptions = OptionsService.getBasemapOptions(this.visualFormattingSettingsModel, {
@@ -300,7 +235,7 @@ export class RoseaMapViz implements IVisual {
             try {
                 this.mapService.updateBasemap(basemapOptions);
             } catch (e) {
-                this.host.displayWarningIcon('Basemap error', 'roseaMapVizWarning: Failed to update basemap. Previous basemap retained.');
+                this.stateManager.displayWarning('Basemap error', 'roseaMapVizWarning: Failed to update basemap. Previous basemap retained.');
             }
 
             // Zoom control + legend styling
@@ -318,13 +253,13 @@ export class RoseaMapViz implements IVisual {
                 this.colorRampManager = new ColorRampManager(selectedColorRamp);
                 this.dataService = new ChoroplethDataService(this.colorRampManager, this.host);
             } catch (e) {
-                this.host.displayWarningIcon('Color ramp error', 'roseaMapVizWarning: Failed to initialize color ramp. Layers may not render.');
+                this.stateManager.displayWarning('Color ramp error', 'roseaMapVizWarning: Failed to initialize color ramp. Layers may not render.');
             }
 
             // No data -> clear overlays, keep basemap visible
             if (!dataView || !dataView.categorical) {
                 this.svg.selectAll('*').remove();
-                this.legendContainer.style.display = 'none';
+                this.domManager.setLegendVisible(false);
                 return; // finally will fire
             }
 
@@ -343,8 +278,8 @@ export class RoseaMapViz implements IVisual {
                     if (res && typeof (res as any).then === 'function') {
                         (res as unknown as Promise<any>)
                             .then(layer => { this.choroplethLayer = layer as any; this.updateOverlayVisibility(); })
-                            .catch(err => {
-                                try { this.host.displayWarningIcon('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.'); } catch {}
+                            .catch(() => {
+                                try { this.stateManager.displayWarning('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.'); } catch {}
                             });
                     } else {
                         // Non-promise return (defensive): assign directly
@@ -352,14 +287,14 @@ export class RoseaMapViz implements IVisual {
                         this.updateOverlayVisibility();
                     }
                 } catch (err) {
-                    this.host.displayWarningIcon('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.');
+                    this.stateManager.displayWarning('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.');
                 }
             } else {
                 const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
                 group.selectAll('*').remove();
                 try { this.svg.select('#choropleth-hitlayer').remove(); } catch {}
                 try {
-                    const el = this.svgContainer.querySelector('#choropleth-canvas');
+                    const el = elements.svgContainer.querySelector('#choropleth-canvas');
                     if (el && el.parentElement) el.parentElement.removeChild(el);
                 } catch {}
                 if (this.choroplethLayer) {
@@ -384,15 +319,15 @@ export class RoseaMapViz implements IVisual {
                     if (res && typeof (res as any).then === 'function') {
                         (res as unknown as Promise<any>)
                             .then(layer => { this.circleLayer = layer as any; this.updateOverlayVisibility(); })
-                            .catch(err => {
-                                this.host.displayWarningIcon('Circle render error', 'roseaMapVizWarning: Failed to render circle layer.');
+                            .catch(() => {
+                                this.stateManager.displayWarning('Circle render error', 'roseaMapVizWarning: Failed to render circle layer.');
                             });
                     } else {
                         this.circleLayer = res as any;
                         this.updateOverlayVisibility();
                     }
                 } catch (err) {
-                    this.host.displayWarningIcon('Circle render error', 'roseaMapVizWarning: Failed to render circle layer.');
+                    this.stateManager.displayWarning('Circle render error', 'roseaMapVizWarning: Failed to render circle layer.');
                 }
             } else {
                 const group1 = this.svg.select(`#${DomIds.CirclesGroup1}`);
@@ -401,7 +336,7 @@ export class RoseaMapViz implements IVisual {
                 group2.selectAll('*').remove();
                 try { this.svg.select('#circles-hitlayer').remove(); } catch {}
                 try {
-                    const el = this.svgContainer.querySelector('#circles-canvas');
+                    const el = elements.svgContainer.querySelector('#circles-canvas');
                     if (el && el.parentElement) el.parentElement.removeChild(el);
                 } catch {}
                 if (this.circleLayer) {
@@ -417,76 +352,34 @@ export class RoseaMapViz implements IVisual {
             const parentLegendVisible =
                 (choroplethOptions.layerControl === true && choroplethOptions.showLegend === true) ||
                 (circleOptions.layerControl === true && circleOptions.showLegend === true);
-            this.legendContainer.style.display = parentLegendVisible ? 'block' : 'none';
+            this.domManager.setLegendVisible(parentLegendVisible);
 
             // Resize and attach map tools
             try { this.map.updateSize(); } catch {}
             this.mapToolsOrchestrator.attach(this.mapToolsOptions, (extentStr, zoom) =>
-                this.persistCurrentExtentAsLocked(extentStr, zoom)
+                this.stateManager.persistLockedExtent(extentStr, zoom)
             );
-            this.previousLockMapExtent = this.mapToolsOptions.lockMapExtent;
+            this.stateManager.setPreviousLockMapExtent(this.mapToolsOptions.lockMapExtent);
         } catch (e) {
-            this.host.displayWarningIcon('Rendering error', 'roseaMapVizWarning: An unexpected error occurred while rendering. Basemap may still be visible.');
+            this.stateManager.displayWarning('Rendering error', 'roseaMapVizWarning: An unexpected error occurred while rendering. Basemap may still be visible.');
         } finally {
             this.events.renderingFinished(options);
         }
     }
 
-
-    // (legacy circle/choropleth methods removed; rendering handled by orchestrators)
-
     private updateLegendContainer(): void {
-
-        const opacity = this.mapToolsOptions.legendBackgroundOpacity;
-        const rgbaColor = this.legendService.hexToRgba(this.mapToolsOptions.legendBackgroundColor, opacity);
-        this.legendContainer.style.backgroundColor = rgbaColor;
-
-        // Update legend container styles
-        //this.legendContainer.style.background = this.mapToolsOptions.legendBackgroundColor;
-        //this.legendContainer.style.opacity = this.mapToolsOptions.legendBackgroundOpacity.toString();
-        this.legendContainer.style.border = `${this.mapToolsOptions.legendBorderWidth}px solid ${this.mapToolsOptions.legendBorderColor}`;
-        this.legendContainer.style.borderRadius = `${this.mapToolsOptions.legendBorderRadius}px`;
-        this.legendContainer.style.marginBottom = `${this.mapToolsOptions.legendBottomMargin}px`;
-        this.legendContainer.style.marginTop = `${this.mapToolsOptions.legendTopMargin}px`;
-        this.legendContainer.style.marginLeft = `${this.mapToolsOptions.legendLeftMargin}px`;
-        this.legendContainer.style.marginRight = `${this.mapToolsOptions.legendRightMargin}px`;
-
-        // Reset all positioning properties first
-        this.legendContainer.style.top = 'auto';
-        this.legendContainer.style.right = 'auto';
-        this.legendContainer.style.bottom = 'auto';
-        this.legendContainer.style.left = 'auto';
-        this.legendContainer.style.transform = 'none'; // Reset any previous transforms
-
-        // Set new position
-        switch (this.mapToolsOptions.legendPosition) {
-            case LegendPositions.TopRight:
-                this.legendContainer.style.top = '10px';
-                this.legendContainer.style.right = '10px';
-                break;
-            case LegendPositions.TopLeft:
-                this.legendContainer.style.top = '10px';
-                this.legendContainer.style.left = '10px';
-                break;
-            case LegendPositions.BottomRight:
-                this.legendContainer.style.bottom = '10px';
-                this.legendContainer.style.right = '10px';
-                break;
-            case LegendPositions.TopCenter:
-                this.legendContainer.style.top = '10px';
-                this.legendContainer.style.left = '50%';
-                this.legendContainer.style.transform = 'translateX(-50%)';
-                break;
-            case LegendPositions.BottomCenter:
-                this.legendContainer.style.bottom = '10px';
-                this.legendContainer.style.left = '50%';
-                this.legendContainer.style.transform = 'translateX(-50%)';
-                break;
-            default: // bottom-left (default)
-                this.legendContainer.style.bottom = '10px';
-                this.legendContainer.style.left = '10px';
-                break;
-        }
+        this.domManager.updateLegendContainer({
+            backgroundColor: this.mapToolsOptions.legendBackgroundColor,
+            backgroundOpacity: this.mapToolsOptions.legendBackgroundOpacity,
+            borderWidth: this.mapToolsOptions.legendBorderWidth,
+            borderColor: this.mapToolsOptions.legendBorderColor,
+            borderRadius: this.mapToolsOptions.legendBorderRadius,
+            marginBottom: this.mapToolsOptions.legendBottomMargin,
+            marginTop: this.mapToolsOptions.legendTopMargin,
+            marginLeft: this.mapToolsOptions.legendLeftMargin,
+            marginRight: this.mapToolsOptions.legendRightMargin,
+            position: this.mapToolsOptions.legendPosition
+        });
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
@@ -495,24 +388,11 @@ export class RoseaMapViz implements IVisual {
         );
     }
 
-
     public destroy(): void {
-
         this.map.setTarget(null);
         this.svg.selectAll('*').remove();
-
+        this.domManager.dispose();
     }
-
-    private persistCurrentExtentAsLocked(extentString: string, zoom: number) {
-        this.host.persistProperties({
-            merge: [{
-                objectName: VisualObjectNames.MapControls,
-                properties: { [VisualObjectProps.LockedMapExtent]: extentString, [VisualObjectProps.LockedMapZoom]: zoom },
-                selector: null
-            }]
-        });
-    }
-
 }
 
 

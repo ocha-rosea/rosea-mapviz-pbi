@@ -25,3 +25,7 @@ export { MapService } from "./MapService";
 export { MessageService } from "./MessageService";
 export { OptionsService } from "./OptionsService";
 export { ZoomControlManager } from "./ZoomControlManager";
+export { DOMManager } from "./DOMManager";
+export type { DOMElements, LegendPositionConfig } from "./DOMManager";
+export { StateManager } from "./StateManager";
+export type { StateManagerConfig } from "./StateManager";
