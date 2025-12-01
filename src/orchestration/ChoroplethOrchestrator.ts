@@ -83,6 +83,27 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     }
 
     /**
+     * Sets whether interactions (click/selection) are allowed for the choropleth layer.
+     * Should be set to false when visual is pinned to a dashboard tile.
+     * 
+     * @param allowInteractions - Whether click/selection interactions are permitted
+     */
+    public setAllowInteractions(allowInteractions: boolean): void {
+        this.choroplethOptsBuilder.setAllowInteractions(allowInteractions);
+    }
+
+    /**
+     * Override setHighContrast to also update the layer options builder.
+     * 
+     * @param isHighContrast - Whether high contrast mode is enabled
+     * @param colors - High contrast colors from Power BI
+     */
+    public override setHighContrast(isHighContrast: boolean, colors: import("../types").HighContrastColors | null): void {
+        super.setHighContrast(isHighContrast, colors);
+        this.choroplethOptsBuilder.setHighContrast(isHighContrast, colors);
+    }
+
+    /**
      * Returns the current choropleth layer instance if one exists.
      * 
      * @returns The active choropleth layer (Canvas, WebGL, or SVG), or undefined if not rendered

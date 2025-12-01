@@ -62,7 +62,16 @@ export class CircleLayer extends Layer {
     const d3Projection = createWebMercatorProjection(frameState, width, height);
 
         const { combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
-        const { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType } = circleOptions;
+        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType } = circleOptions;
+
+        // High contrast mode: override colors with system colors
+        if (this.options.isHighContrast && this.options.highContrastColors) {
+            const hcColors = this.options.highContrastColors;
+            color1 = hcColors.foreground;
+            color2 = hcColors.hyperlink; // Use hyperlink color for secondary color to differentiate
+            strokeColor = hcColors.background;
+            strokeWidth = Math.max(2, strokeWidth); // Minimum 2px stroke in HC mode
+        }
 
         // For donut/pie charts, we need to include the totals in our scaling calculations
         const allRelevantValues = [...combinedCircleSizeValues];
@@ -155,19 +164,31 @@ export class CircleLayer extends Layer {
                         );
                     }
 
-                    // Click for donut arcs
-                    [arc1, arc2].forEach(arcElem => {
-                        arcElem.on('click', (event: MouseEvent) => {
-                            const selectionId = feature.properties.selectionId;
-                            const nativeEvent = event;
-                            this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                                .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
-                                    this.selectedIds = selectedIds;
-                                    // Selection updated; trigger re-render
-                                    this.changed();
-                                });
+                    // Click for donut arcs (only if interactions are allowed)
+                    if (this.options.allowInteractions !== false) {
+                        [arc1, arc2].forEach(arcElem => {
+                            arcElem.on('click', (event: MouseEvent) => {
+                                const selectionId = feature.properties.selectionId;
+                                const nativeEvent = event;
+                                this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                                    .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                        this.selectedIds = selectedIds;
+                                        // Selection updated; trigger re-render
+                                        this.changed();
+                                    });
+                            });
+
+                            // Context menu for donut arcs
+                            arcElem.on('contextmenu', (event: MouseEvent) => {
+                                event.preventDefault();
+                                const selectionId = feature.properties.selectionId;
+                                this.options.selectionManager.showContextMenu(
+                                    selectionId ? selectionId : {},
+                                    { x: event.clientX, y: event.clientY }
+                                );
+                            });
                         });
-                    });
+                    }
                 } else if (chartType === 'pie-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
                     // Draw pie chart at (x, y)
                     const value1 = circle1SizeValues[i];
@@ -240,19 +261,31 @@ export class CircleLayer extends Layer {
                         );
                     }
 
-                    // Click for pie arcs
-                    [arc1, arc2].forEach(arcElem => {
-                        arcElem.on('click', (event: MouseEvent) => {
-                            const selectionId = feature.properties.selectionId;
-                            const nativeEvent = event;
-                            this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                                .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
-                                    this.selectedIds = selectedIds;
-                                    // Selection updated; trigger re-render
-                                    this.changed();
-                                });
+                    // Click for pie arcs (only if interactions are allowed)
+                    if (this.options.allowInteractions !== false) {
+                        [arc1, arc2].forEach(arcElem => {
+                            arcElem.on('click', (event: MouseEvent) => {
+                                const selectionId = feature.properties.selectionId;
+                                const nativeEvent = event;
+                                this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                                    .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                        this.selectedIds = selectedIds;
+                                        // Selection updated; trigger re-render
+                                        this.changed();
+                                    });
+                            });
+
+                            // Context menu for pie arcs
+                            arcElem.on('contextmenu', (event: MouseEvent) => {
+                                event.preventDefault();
+                                const selectionId = feature.properties.selectionId;
+                                this.options.selectionManager.showContextMenu(
+                                    selectionId ? selectionId : {},
+                                    { x: event.clientX, y: event.clientY }
+                                );
+                            });
                         });
-                    });
+                    }
                 } else {                   
                     const circle1 = circles1Group.append('circle')
                         .attr('cx', x)
@@ -275,16 +308,29 @@ export class CircleLayer extends Layer {
                         );
                     }
 
-                    circle1.on('click', (event: MouseEvent) => {
-                        const selectionId = feature.properties.selectionId;
-                        const nativeEvent = event;
-                        this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                            .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
-                                this.selectedIds = selectedIds; // Update selected IDs
-                                // Selection updated; trigger re-render
-                                this.changed(); // Trigger re-render to apply new opacity
-                            });
-                    });
+                    // Click handler for circle1 (only if interactions are allowed)
+                    if (this.options.allowInteractions !== false) {
+                        circle1.on('click', (event: MouseEvent) => {
+                            const selectionId = feature.properties.selectionId;
+                            const nativeEvent = event;
+                            this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                                .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                    this.selectedIds = selectedIds; // Update selected IDs
+                                    // Selection updated; trigger re-render
+                                    this.changed(); // Trigger re-render to apply new opacity
+                                });
+                        });
+
+                        // Context menu for circle1
+                        circle1.on('contextmenu', (event: MouseEvent) => {
+                            event.preventDefault();
+                            const selectionId = feature.properties.selectionId;
+                            this.options.selectionManager.showContextMenu(
+                                selectionId ? selectionId : {},
+                                { x: event.clientX, y: event.clientY }
+                            );
+                        });
+                    }
 
                     if (circle2SizeValues.length > 0) {
                         const circle2 = circles2Group.append('circle')
@@ -308,16 +354,29 @@ export class CircleLayer extends Layer {
                             );
                         }
 
-                        circle2.on('click', (event: MouseEvent) => {
-                            const selectionId = feature.properties.selectionId;
-                            const nativeEvent = event;
-                            this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                                .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
-                                    this.selectedIds = selectedIds; // Update selected IDs
-                                    // Selection updated; trigger re-render
-                                    this.changed(); // Trigger re-render to apply new opacity
-                                });
-                        });
+                        // Click handler for circle2 (only if interactions are allowed)
+                        if (this.options.allowInteractions !== false) {
+                            circle2.on('click', (event: MouseEvent) => {
+                                const selectionId = feature.properties.selectionId;
+                                const nativeEvent = event;
+                                this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                                    .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                        this.selectedIds = selectedIds; // Update selected IDs
+                                        // Selection updated; trigger re-render
+                                        this.changed(); // Trigger re-render to apply new opacity
+                                    });
+                            });
+
+                            // Context menu for circle2
+                            circle2.on('contextmenu', (event: MouseEvent) => {
+                                event.preventDefault();
+                                const selectionId = feature.properties.selectionId;
+                                this.options.selectionManager.showContextMenu(
+                                    selectionId ? selectionId : {},
+                                    { x: event.clientX, y: event.clientY }
+                                );
+                            });
+                        }
                     }
                 }
             }

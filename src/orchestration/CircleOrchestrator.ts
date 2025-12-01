@@ -67,6 +67,27 @@ export class CircleOrchestrator extends BaseOrchestrator {
     }
 
     /**
+     * Sets whether interactions (click/selection) are allowed for the circle layer.
+     * Should be set to false when visual is pinned to a dashboard tile.
+     * 
+     * @param allowInteractions - Whether click/selection interactions are permitted
+     */
+    public setAllowInteractions(allowInteractions: boolean): void {
+        this.circleOptsBuilder.setAllowInteractions(allowInteractions);
+    }
+
+    /**
+     * Override setHighContrast to also update the layer options builder.
+     * 
+     * @param isHighContrast - Whether high contrast mode is enabled
+     * @param colors - High contrast colors from Power BI
+     */
+    public override setHighContrast(isHighContrast: boolean, colors: import("../types").HighContrastColors | null): void {
+        super.setHighContrast(isHighContrast, colors);
+        this.circleOptsBuilder.setHighContrast(isHighContrast, colors);
+    }
+
+    /**
      * Returns the current circle layer instance.
      * 
      * @returns The active circle layer or undefined if not rendered

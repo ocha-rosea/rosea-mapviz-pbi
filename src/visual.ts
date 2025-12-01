@@ -31,6 +31,7 @@ import "./../style/visual.less";
 
 import { createTooltipServiceWrapper, ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
@@ -41,7 +42,7 @@ import { MessageService, DOMManager, StateManager } from "./services";
 
 import { RoseaMapVizFormattingSettingsModel } from "./settings"; import "ol/ol.css";
 import Map from "ol/Map";
-import { MapToolsOptions } from "./types/index";
+import { MapToolsOptions, HighContrastColors } from "./types/index";
 import type { CircleLayer } from "./layers/circleLayer";
 import type { ChoroplethLayer } from "./layers/choroplethLayer";
 import type { CircleCanvasLayer } from "./layers/canvas/circleCanvasLayer";
@@ -92,6 +93,10 @@ export class RoseaMapViz implements IVisual {
     private mapToolsOrchestrator: MapToolsOrchestrator;
     private circleOrchestrator: CircleOrchestrator;
     private choroplethOrchestrator: ChoroplethOrchestrator;
+
+    // High Contrast Mode
+    private isHighContrast: boolean = false;
+    private highContrastColors: HighContrastColors | null = null;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
@@ -165,6 +170,19 @@ export class RoseaMapViz implements IVisual {
             tooltipServiceWrapper: this.tooltipServiceWrapper,
             cacheService: this.cacheService,
         });
+
+        // Add context menu handler for empty map area (right-click on map background)
+        this.container.addEventListener('contextmenu', (event: MouseEvent) => {
+            // Only handle if target is the map container or viewport (not data points)
+            const target = event.target as HTMLElement;
+            if (target.closest('.ol-viewport') && !target.closest('path') && !target.closest('circle')) {
+                event.preventDefault();
+                this.selectionManager.showContextMenu(
+                    {},
+                    { x: event.clientX, y: event.clientY }
+                );
+            }
+        });
     }
 
     private updateOverlayVisibility(): void {
@@ -181,6 +199,20 @@ export class RoseaMapViz implements IVisual {
         try {
             const dataView = options.dataViews[0];
             this.map.setView(this.view); // default view
+
+            // Detect high contrast mode
+            const colorPalette = this.host.colorPalette as ISandboxExtendedColorPalette;
+            this.isHighContrast = colorPalette?.isHighContrast ?? false;
+            if (this.isHighContrast && colorPalette) {
+                this.highContrastColors = {
+                    foreground: colorPalette.foreground?.value ?? '#ffffff',
+                    background: colorPalette.background?.value ?? '#000000',
+                    foregroundSelected: colorPalette.foregroundSelected?.value ?? '#00ffff',
+                    hyperlink: colorPalette.hyperlink?.value ?? '#ffff00'
+                };
+            } else {
+                this.highContrastColors = null;
+            }
 
             // Update formatting settings
             this.visualFormattingSettingsModel = this.formattingSettingsService
@@ -256,14 +288,27 @@ export class RoseaMapViz implements IVisual {
                 this.stateManager.displayWarning('Color ramp error', 'roseaMapVizWarning: Failed to initialize color ramp. Layers may not render.');
             }
 
-            // No data -> clear overlays, keep basemap visible
+            // No data -> clear overlays, show landing page, keep basemap visible
             if (!dataView || !dataView.categorical) {
                 this.svg.selectAll('*').remove();
                 this.domManager.setLegendVisible(false);
+                this.domManager.showLandingPage();
                 return; // finally will fire
             }
 
+            // Hide landing page when data is available
+            this.domManager.hideLandingPage();
+
             this.choroplethDisplayed = choroplethOptions.layerControl;
+
+            // Check if interactions are allowed (e.g., false when pinned to dashboard tile)
+            const allowInteractions = this.host.hostCapabilities?.allowInteractions !== false;
+            this.circleOrchestrator.setAllowInteractions(allowInteractions);
+            this.choroplethOrchestrator.setAllowInteractions(allowInteractions);
+
+            // Pass high contrast state to orchestrators
+            this.circleOrchestrator.setHighContrast(this.isHighContrast, this.highContrastColors);
+            this.choroplethOrchestrator.setHighContrast(this.isHighContrast, this.highContrastColors);
 
             // Choropleth layer (async) with guarded errors
             if (choroplethOptions.layerControl === true) {

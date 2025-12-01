@@ -3,6 +3,25 @@ import { LegendOrientations, LegendLabelPositions, ClassificationMethods } from 
 export type LegendOrientation = typeof LegendOrientations[keyof typeof LegendOrientations];
 export type LegendLabelPosition = typeof LegendLabelPositions[keyof typeof LegendLabelPositions];
 export type ClassificationMethod = typeof ClassificationMethods[keyof typeof ClassificationMethods];
+
+// ============================================================================
+// High Contrast Mode Types
+// ============================================================================
+
+/**
+ * High contrast color palette for accessibility support.
+ * These colors are provided by Power BI when high contrast mode is enabled.
+ */
+export interface HighContrastColors {
+    /** Foreground color (text, icons, data elements) */
+    foreground: string;
+    /** Background color */
+    background: string;
+    /** Color for selected/highlighted elements */
+    foregroundSelected: string;
+    /** Color for hyperlinks and interactive elements */
+    hyperlink: string;
+}
 import { FeatureCollection } from "geojson";
 import * as d3 from "d3";
 import { Collection } from "ol";
@@ -134,6 +153,12 @@ export interface LayerOptions extends OlLayerOptions {
     svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
     svgContainer: HTMLElement;
     zIndex: number;
+    /** Whether interactions (selection, click) are allowed. When false (e.g., on dashboard tiles), click handlers should be disabled. */
+    allowInteractions?: boolean;
+    /** Whether high contrast mode is enabled */
+    isHighContrast?: boolean;
+    /** High contrast colors from Power BI (only set when isHighContrast is true) */
+    highContrastColors?: HighContrastColors;
     // tooltipServiceWrapper: ITooltipServiceWrapper;
     // selectionManager: ISelectionManager;
 }

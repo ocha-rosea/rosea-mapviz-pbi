@@ -139,21 +139,45 @@ export class ChoroplethLayer extends Layer {
             const pCode = feature.properties[this.options.dataKey];
             const valueRaw = this.valueLookup[pCode];
             
-            // Use valueRaw as-is for colorScale (do not force to number if unique value mode)
-            const fillColor = (pCode === undefined || isNoDataValue(valueRaw))
-                ? NO_DATA_COLOR
-                : this.options.colorScale(valueRaw);
-            
+            // In high contrast mode, use foreground color for all data regions
+            // Otherwise, use the normal color scale
+            let fillColor: string;
+            let strokeColor: string;
+            let strokeWidth: number;
             
             const dataPoint = dataPointsLookup[pCode];
+            const isSelected = this.selectedIds.length > 0 && 
+                this.selectedIds.some(s => dataPoint?.selectionId && 
+                    (s as any).equals?.(dataPoint.selectionId) || s === dataPoint?.selectionId);
+            
+            if (this.options.isHighContrast && this.options.highContrastColors) {
+                // High contrast mode: use system colors
+                if (pCode === undefined || isNoDataValue(valueRaw)) {
+                    fillColor = NO_DATA_COLOR;
+                } else if (isSelected) {
+                    // Use foregroundSelected for selected items
+                    fillColor = this.options.highContrastColors.foregroundSelected;
+                } else {
+                    fillColor = this.options.highContrastColors.foreground;
+                }
+                strokeColor = this.options.highContrastColors.background;
+                strokeWidth = Math.max(2, this.options.strokeWidth); // Minimum 2px stroke in HC mode
+            } else {
+                // Normal mode: use configured color scale
+                fillColor = (pCode === undefined || isNoDataValue(valueRaw))
+                    ? NO_DATA_COLOR
+                    : this.options.colorScale(valueRaw);
+                strokeColor = this.options.strokeColor;
+                strokeWidth = this.options.strokeWidth;
+            }
 
             const path = choroplethGroup.append('path')
                 .datum(feature)
                 .style('cursor', 'pointer')
                 .style('pointer-events', 'all')
                 .attr('d', this.d3Path)
-                .attr('stroke', this.options.strokeColor)
-                .attr('stroke-width', this.options.strokeWidth)
+                .attr('stroke', strokeColor)
+                .attr('stroke-width', strokeWidth)
                 .attr('fill', fillColor)
                 .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, dataPoint?.selectionId, this.options.fillOpacity));
 
@@ -167,17 +191,29 @@ export class ChoroplethLayer extends Layer {
                 );
             }
 
-            // Add click handler for selection
-            path.on('click', (event: MouseEvent) => {
-                if (!dataPoint?.selectionId) return;
+            // Add click handler for selection (only if interactions are allowed)
+            if (this.options.allowInteractions !== false) {
+                path.on('click', (event: MouseEvent) => {
+                    if (!dataPoint?.selectionId) return;
 
-                const nativeEvent = event;
-                this.options.selectionManager.select(dataPoint.selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                    .then((selectedIds: ISelectionId[]) => {
-                        this.selectedIds = selectedIds;
-                        this.changed();
-                    });
-            });
+                    const nativeEvent = event;
+                    this.options.selectionManager.select(dataPoint.selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                        .then((selectedIds: ISelectionId[]) => {
+                            this.selectedIds = selectedIds;
+                            this.changed();
+                        });
+                });
+
+                // Add context menu handler for right-click
+                path.on('contextmenu', (event: MouseEvent) => {
+                    event.preventDefault();
+                    const selectionId = dataPoint?.selectionId;
+                    this.options.selectionManager.showContextMenu(
+                        selectionId ? selectionId : {},
+                        { x: event.clientX, y: event.clientY }
+                    );
+                });
+            }
         });
 
         // Re-order layers to ensure circles are on top

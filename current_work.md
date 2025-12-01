@@ -1,451 +1,480 @@
-# ROSEA MapViz Power BI Visual - Refactoring Plan
+# ROSEA MapViz Power BI Visual - Feature Enhancement Plan
 
-## Current State Analysis
+## Overview
 
-### Overview
-The ROSEA MapViz is a Power BI custom visual that renders geographic data as:
-1. **Choropleth maps** - Color-coded boundary regions (countries, states, etc.)
-2. **Scaled circles** - Proportional symbols at point locations
+This plan addresses the 7 missing Power BI custom visual features identified during the build process. These features improve accessibility, usability, and integration with Power BI's native capabilities.
 
-### Architecture Summary
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         visual.ts (519 lines)                    │
-│                    Entry Point / Main Orchestrator               │
-├─────────────────────────────────────────────────────────────────┤
-│                       settings.ts (1539 lines)                   │
-│            Formatting Model / Power BI Settings Pane             │
-├─────────────────────────────────────────────────────────────────┤
-│                     capabilities.json (692 lines)                │
-│              Data Roles / Field Mappings / Objects               │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        ▼                       ▼                       ▼
-┌──────────────┐      ┌──────────────┐      ┌──────────────────┐
-│ Orchestrators│      │   Services   │      │      Layers      │
-├──────────────┤      ├──────────────┤      ├──────────────────┤
-│ Choropleth   │      │ MapService   │      │ choroplethLayer  │
-│ Circle       │      │ LegendService│      │ circleLayer      │
-│ MapTools     │      │ CacheService │      │ canvas/*         │
-│ Base         │      │ OptionsService│     │ webgl/*          │
-└──────────────┘      │ ColorRamp*   │      └──────────────────┘
-                      │ DataRole     │
-                      │ GeoBoundaries│
-                      │ Message      │
-                      └──────────────┘
-```
+### Build Warnings to Address:
+1. **Allow Interactions** - Respect `allowInteractions` flag for dashboard tiles
+2. **Color Palette** - Use Power BI's color palette service
+3. **Context Menu** - Enable right-click context menus on data points
+4. **High Contrast** - Support Windows high-contrast accessibility mode
+5. **Keyboard Navigation** - Enable keyboard focus and tab navigation
+6. **Landing Page** - Show instructional content when no data is provided
+7. **Localizations** - Support multiple languages for UI text
 
 ---
 
-## Key Issues Identified
+## Feature Analysis
 
-### 1. **settings.ts is Monolithic (1539 lines)**
-- Contains 15+ settings group classes in one file
-- Business logic mixed with UI configuration
-- Async data fetching inside formatting pane classes
-- Difficult to test individual settings groups
+### 1. Allow Interactions ⚡ (Quick Win)
+**Effort:** Low | **Impact:** Medium | **Priority:** HIGH
 
-### 2. **visual.ts has Mixed Responsibilities (~519 lines)**
-- DOM management
-- Service instantiation
-- Layer lifecycle management
-- Legend positioning
-- State persistence
-- Error handling scattered throughout
+**Current State:** Not implemented - visual always allows interactions regardless of context
 
-### 3. **Inconsistent Naming Conventions**
-- `proportalCircles` (typo - should be `proportional`)
-- Mixed camelCase/PascalCase in property names
-- Some class names don't match file names
+**What's Needed:**
+- Check `options.host.hostCapabilities.allowInteractions` flag
+- Disable click/selection events when flag is `false` (e.g., dashboard tiles)
+- Tooltips should still work per Microsoft best practices
 
-### 4. **Tight Coupling**
-- `visual.ts` directly manipulates DOM elements
-- Orchestrators depend on specific SVG/Canvas container structures
-- Settings groups have async side effects during display rule application
+**Implementation:**
+```typescript
+// In visual.ts constructor
+private allowInteractions: boolean = true;
 
-### 5. **Type Safety Gaps**
-- Many `any` types throughout codebase
-- Options interfaces don't fully cover all settings
-- Layer types use union types with `as any` casts
+// In update method
+this.allowInteractions = options.host.hostCapabilities?.allowInteractions ?? true;
 
-### 6. **Missing Abstraction Layers**
-- No clear separation between UI state and domain logic
-- Legend positioning logic embedded in visual.ts
-- Color ramp configuration scattered across multiple services
+// Pass to orchestrators/layers - check before selection
+if (this.allowInteractions) {
+    selectionManager.select(selectionId);
+}
+```
+
+**Files to Modify:**
+- `src/visual.ts` - Store and update flag
+- `src/layers/choroplethLayer.ts` - Check before selection
+- `src/layers/circleLayer.ts` - Check before selection
+- `src/layers/canvas/*.ts` - Check before selection
+- `src/layers/webgl/*.ts` - Check before selection
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/visuals-interactions
 
 ---
 
-## Refactoring Plan
+### 2. Color Palette ⚡ (Quick Win)
+**Effort:** Low | **Impact:** Low | **Priority:** LOW
 
-### Phase 1: Settings Module Decomposition
-**Goal:** Break `settings.ts` into focused, testable modules
+**Current State:** Visual uses custom color configuration from settings, not Power BI's theme colors
 
-#### 1.1 Create Settings Directory Structure
-```
-src/settings/
-├── index.ts                      # Re-exports RoseaMapVizFormattingSettingsModel
-├── FormattingSettingsModel.ts    # Main model (minimal)
-├── groups/
-│   ├── index.ts
-│   ├── BasemapSettingsGroup.ts
-│   ├── MapboxSettingsGroup.ts
-│   ├── MaptilerSettingsGroup.ts
-│   ├── CircleDisplaySettingsGroup.ts
-│   ├── CircleLegendSettingsGroup.ts
-│   ├── ChoroplethBoundarySettingsGroup.ts
-│   ├── ChoroplethClassificationSettingsGroup.ts
-│   ├── ChoroplethDisplaySettingsGroup.ts
-│   ├── ChoroplethLegendSettingsGroup.ts
-│   ├── MapToolsSettingsGroup.ts
-│   └── LegendContainerSettingsGroup.ts
-├── cards/
-│   ├── index.ts
-│   ├── BasemapCard.ts
-│   ├── CircleCard.ts
-│   ├── ChoroplethCard.ts
-│   └── ControlsCard.ts
-└── behaviors/
-    ├── ConditionalVisibility.ts   # Extracted display rule logic
-    └── GeoBoundariesLoader.ts     # Async catalog/data fetching
+**What's Needed:**
+- Use `host.colorPalette.getColor()` for default data point colors
+- Fall back to palette colors when user hasn't specified custom colors
+
+**Note:** This visual already has extensive color customization (color ramps, custom colors). The palette integration would be for default/fallback colors only.
+
+**Implementation:**
+```typescript
+// In visual.ts
+const colorPalette: IColorPalette = this.host.colorPalette;
+
+// When assigning default circle colors
+const defaultColor = colorPalette.getColor(category).value;
 ```
 
-#### 1.2 Extract Async Logic from Settings
-- Move `populateReleaseAndAdminFromCatalog()` to a dedicated service
-- Move `populateBoundaryIdFieldsFromData()` to GeoBoundariesService
-- Settings groups should be pure configuration with no side effects
+**Files to Modify:**
+- `src/visual.ts` - Initialize color palette
+- `src/services/OptionsService.ts` - Provide palette fallback colors
 
-#### 1.3 Fix Naming Inconsistencies
-- Rename `proportalCircles*` → `proportionalCircles*`
-- Ensure all class names match their purpose
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/add-colors-power-bi-visual
 
 ---
 
-### Phase 2: Visual.ts Decomposition
-**Goal:** Reduce visual.ts to pure coordination, delegating all work to services
+### 3. Context Menu ✨ (Medium)
+**Effort:** Medium | **Impact:** High | **Priority:** HIGH
 
-#### 2.1 Create VisualLifecycleManager
+**Current State:** No right-click context menu support
+
+**What's Needed:**
+- Handle `contextmenu` events on map elements
+- Call `selectionManager.showContextMenu()` with data point and position
+- Support both empty-space and data-point context menus
+
+**Implementation:**
 ```typescript
-// src/lifecycle/VisualLifecycleManager.ts
-export class VisualLifecycleManager {
-    constructor(private host: IVisualHost) {}
-    
-    onConstruct(options: VisualConstructorOptions): void;
-    onUpdate(options: VisualUpdateOptions): void;
-    onDestroy(): void;
+// In layer classes
+this.container.on('contextmenu', (event: PointerEvent) => {
+    const dataPoint = this.getDataPointAtPosition(event);
+    this.selectionManager.showContextMenu(
+        dataPoint ? dataPoint.selectionId : {},
+        { x: event.clientX, y: event.clientY }
+    );
+    event.preventDefault();
+});
+```
+
+**Files to Modify:**
+- `src/layers/choroplethLayer.ts` - Add contextmenu handler
+- `src/layers/circleLayer.ts` - Add contextmenu handler
+- `src/layers/canvas/choroplethCanvasLayer.ts` - Add contextmenu handler
+- `src/layers/canvas/circleCanvasLayer.ts` - Add contextmenu handler
+- `src/layers/webgl/choroplethWebGLLayer.ts` - Add contextmenu handler
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/context-menu
+
+---
+
+### 4. High Contrast 🎨 ✅ COMPLETED
+**Effort:** Medium | **Impact:** High | **Priority:** HIGH (Accessibility)
+
+**Status:** ✅ COMPLETED
+
+**Implementation Summary:**
+- Added `HighContrastColors` interface to `src/types/index.ts`
+- Added high contrast detection in `visual.ts` using `ISandboxExtendedColorPalette`
+- Added `isHighContrast` and `highContrastColors` properties to `LayerOptions` interface
+- Updated `BaseOrchestrator` with `setHighContrast()` method
+- Overrode `setHighContrast()` in `ChoroplethOrchestrator` and `CircleOrchestrator`
+- Updated `LayerOptionBuilders` to pass high contrast state to layers
+- Modified `choroplethLayer.ts` to use high contrast colors:
+  - Foreground color for data fills
+  - Background color for strokes
+  - ForegroundSelected for selected items
+  - Minimum 2px stroke width
+- Modified `circleLayer.ts` to use high contrast colors:
+  - Foreground color for primary circles
+  - Hyperlink color for secondary circles (differentiation)
+  - Background color for strokes
+  - Minimum 2px stroke width
+
+**Files Modified:**
+- `src/types/index.ts` - Added HighContrastColors interface, updated LayerOptions
+- `src/visual.ts` - Added ISandboxExtendedColorPalette import, detection logic
+- `src/orchestration/BaseOrchestrator.ts` - Added setHighContrast() method
+- `src/orchestration/ChoroplethOrchestrator.ts` - Override setHighContrast()
+- `src/orchestration/CircleOrchestrator.ts` - Override setHighContrast()
+- `src/services/LayerOptionBuilders.ts` - Added setHighContrast() to both builders
+- `src/layers/choroplethLayer.ts` - High contrast styling in render()
+- `src/layers/circleLayer.ts` - High contrast styling in render()
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/high-contrast-support
+
+---
+
+### 5. Keyboard Navigation ♿ ✅ COMPLETED (Phase 2)
+**Effort:** Medium | **Impact:** High | **Priority:** HIGH (Accessibility)
+
+**Current State:** No keyboard navigation support
+
+**What's Needed:**
+- Add `supportsKeyboardFocus: true` to capabilities.json
+- Make data points focusable (tabindex)
+- Handle Enter/Tab/Escape key navigation
+- Visual focus indicators
+
+**Implementation:**
+
+1. **capabilities.json:**
+```json
+{
+    "supportsKeyboardFocus": true
 }
 ```
 
-#### 2.2 Create DOMManager Service
+2. **Visual Code:**
 ```typescript
-// src/services/DOMManager.ts
-export class DOMManager {
-    createContainer(id: string, styles: CSSStyleDeclaration): HTMLElement;
-    createSvgOverlay(): SVGSVGElement;
-    positionLegend(position: LegendPosition, margins: MarginConfig): void;
-    updateOverlayVisibility(hasContent: boolean): void;
-}
-```
+// Add tabindex to interactive elements
+element.setAttribute('tabindex', '0');
 
-#### 2.3 Create LayerManager Service
-```typescript
-// src/services/LayerManager.ts
-export class LayerManager {
-    addLayer(layer: BaseLayer): void;
-    removeLayer(id: string): void;
-    updateLayer(id: string, options: LayerOptions): void;
-    getLayer(id: string): BaseLayer | undefined;
-}
-```
-
-#### 2.4 Simplified visual.ts Target (~150 lines)
-```typescript
-export class RoseaMapViz implements IVisual {
-    private lifecycle: VisualLifecycleManager;
-    private dom: DOMManager;
-    private layers: LayerManager;
-    
-    constructor(options: VisualConstructorOptions) {
-        this.lifecycle = new VisualLifecycleManager(options.host);
-        this.dom = new DOMManager(options.element);
-        this.layers = new LayerManager();
-        this.lifecycle.onConstruct(options);
+// Handle keyboard events
+element.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+        this.selectionManager.select(selectionId);
     }
-    
-    update(options: VisualUpdateOptions) {
-        this.lifecycle.onUpdate(options);
-    }
-    
-    getFormattingModel(): FormattingModel {
-        return this.formattingService.buildModel();
-    }
-    
-    destroy(): void {
-        this.lifecycle.onDestroy();
-    }
-}
+});
+
+// Visual focus indicator
+element.addEventListener('focus', () => {
+    element.classList.add('focused');
+});
 ```
+
+**Files to Modify:**
+- `capabilities.json` - Add supportsKeyboardFocus
+- `src/layers/choroplethLayer.ts` - Add keyboard handlers
+- `src/layers/circleLayer.ts` - Add keyboard handlers
+- `style/visual.less` - Add focus styles
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/supportskeyboardfocus-feature
 
 ---
 
-### Phase 3: Type System Improvements
-**Goal:** Eliminate `any` types and improve type safety
+### 6. Landing Page 📄 (Medium)
+**Effort:** Medium | **Impact:** Medium | **Priority:** MEDIUM
 
-#### 3.1 Create Strict Layer Types
-```typescript
-// src/types/layers.ts
-export interface IMapLayer {
-    readonly id: string;
-    attach(map: Map): void;
-    detach(): void;
-    update(options: unknown): void;
-    dispose(): void;
-}
+**Current State:** `supportsLandingPage: false` in capabilities.json
 
-export interface IChoroplethLayer extends IMapLayer {
-    setFeatures(geojson: FeatureCollection): void;
-    setColorScale(scale: ColorScale): void;
-}
+**What's Needed:**
+- Enable `supportsLandingPage: true` and `supportsEmptyDataView: true`
+- Create landing page HTML with:
+  - Visual name and description
+  - Instructions on required data fields
+  - Link to documentation
 
-export interface ICircleLayer extends IMapLayer {
-    setDataPoints(points: CircleDataPoint[]): void;
+**Implementation:**
+
+1. **capabilities.json:**
+```json
+{
+    "supportsLandingPage": true,
+    "supportsEmptyDataView": true
 }
 ```
 
-#### 3.2 Strict Options Types
+2. **Visual Code:**
 ```typescript
-// src/types/options.ts
-export interface ChoroplethOptions {
-    readonly layerControl: boolean;
-    readonly boundarySource: BoundarySource;
-    readonly classification: ClassificationConfig;
-    readonly display: ChoroplethDisplayConfig;
-    readonly legend: LegendConfig;
-}
-```
-
-#### 3.3 Add Branded Types for IDs
-```typescript
-// src/types/brands.ts
-type PCode = string & { readonly __brand: 'PCode' };
-type ISO3Code = string & { readonly __brand: 'ISO3Code' };
-```
-
----
-
-### Phase 4: Service Consolidation
-**Goal:** Reduce service count and clarify responsibilities
-
-#### 4.1 Merge Related Services
-| Current Services | Proposed | Rationale |
-|------------------|----------|-----------|
-| ColorRampHelper, ColorRampManager | ColorService | Single responsibility for colors |
-| GeoBoundariesService, GeoBoundariesCatalogService | GeoBoundariesService | Unified boundary data access |
-| ChoroplethDataService | DataTransformService | Generic data transformation |
-
-#### 4.2 Create Service Registry
-```typescript
-// src/services/ServiceRegistry.ts
-export class ServiceRegistry {
-    static readonly map: MapService;
-    static readonly legend: LegendService;
-    static readonly color: ColorService;
-    static readonly geoBoundaries: GeoBoundariesService;
-    static readonly cache: CacheService;
-    static readonly message: MessageService;
+private handleLandingPage(options: VisualUpdateOptions): void {
+    const hasData = options.dataViews?.[0]?.metadata?.columns?.length > 0;
     
-    static initialize(host: IVisualHost): void;
-}
-```
-
----
-
-### Phase 5: Orchestrator Refactoring
-**Goal:** Standardize orchestrator patterns and reduce duplication
-
-#### 5.1 Strengthen BaseOrchestrator
-```typescript
-// src/orchestration/BaseOrchestrator.ts
-export abstract class BaseOrchestrator<TOptions, TLayer extends IMapLayer> {
-    protected abstract createLayer(options: TOptions): TLayer;
-    protected abstract updateLegend(options: TOptions): void;
-    
-    public render(options: TOptions): TLayer | undefined {
-        this.validate(options);
-        const layer = this.createLayer(options);
-        this.updateLegend(options);
-        return layer;
+    if (!hasData && !this.isLandingPageShown) {
+        this.showLandingPage();
+    } else if (hasData && this.isLandingPageShown) {
+        this.hideLandingPage();
     }
 }
+
+private showLandingPage(): void {
+    const landingPage = document.createElement('div');
+    landingPage.className = 'rosea-landing-page';
+    landingPage.innerHTML = `
+        <div class="landing-content">
+            <h2>ROSEA MapViz</h2>
+            <p>Geographic visualization for choropleth maps and scaled circles</p>
+            <h3>Getting Started:</h3>
+            <ul>
+                <li><strong>Choropleth:</strong> Add Boundary ID and Choropleth Color fields</li>
+                <li><strong>Circles:</strong> Add Longitude, Latitude, and Circle Size fields</li>
+            </ul>
+        </div>
+    `;
+    this.container.appendChild(landingPage);
+}
 ```
 
-#### 5.2 Extract Common Patterns
-- Data validation → `ValidationService`
-- Tooltip building → `TooltipBuilder`
-- Selection handling → `SelectionService`
+**Files to Modify:**
+- `capabilities.json` - Enable landing page flags
+- `src/visual.ts` - Add landing page handling
+- `style/visual.less` - Landing page styles
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/landing-page
 
 ---
 
-### Phase 6: Testing Infrastructure
-**Goal:** Improve testability and coverage
+### 7. Localizations 🌍 (High Effort)
+**Effort:** High | **Impact:** Medium | **Priority:** LOW (can defer)
 
-#### 6.1 Increase Unit Test Isolation
-- Mock all Power BI APIs consistently
-- Create test factories for options/settings
-- Add snapshot tests for legend rendering
+**Current State:** No localization support - all text is hardcoded in English
 
-#### 6.2 Add Integration Test Coverage
-- End-to-end data flow tests
-- Layer interaction tests
-- Settings change propagation tests
+**What's Needed:**
+- Create `stringResources/` folder with language subfolders
+- Add `resources.resjson` files for each supported language
+- Use `localizationManager.getDisplayName()` for all user-facing strings
+- Add `displayNameKey` to capabilities.json data roles
+
+**Implementation:**
+
+1. **Folder Structure:**
+```
+stringResources/
+├── en-US/
+│   └── resources.resjson
+├── es-ES/
+│   └── resources.resjson
+├── fr-FR/
+│   └── resources.resjson
+└── ... (40+ languages supported)
+```
+
+2. **resources.resjson (en-US):**
+```json
+{
+    "Visual_BoundaryID": "Boundary ID",
+    "Visual_Longitude": "Longitude",
+    "Visual_Latitude": "Latitude",
+    "Visual_CircleSize": "Circle Size",
+    "Visual_ChoroplethColor": "Choropleth Color",
+    "Settings_Basemap": "Basemap",
+    "Settings_Choropleth": "Choropleth",
+    "Settings_Circles": "Scaled Circles",
+    "Legend_Title": "Legend"
+}
+```
+
+3. **Visual Code:**
+```typescript
+private localizationManager: ILocalizationManager;
+
+constructor(options: VisualConstructorOptions) {
+    this.localizationManager = options.host.createLocalizationManager();
+}
+
+// Usage
+const legendTitle = this.localizationManager.getDisplayName("Legend_Title");
+```
+
+**Files to Modify:**
+- Create `stringResources/` folder structure
+- `capabilities.json` - Add displayNameKey to all dataRoles and objects
+- `src/visual.ts` - Initialize localizationManager
+- `src/settings.ts` - Use localization for display names
+- `src/services/LegendService.ts` - Localize legend text
+- `src/services/MessageService.ts` - Localize error messages
+
+**Note:** Localization is extensive work (40+ languages × 50+ strings). Consider starting with priority languages: en-US, es-ES, fr-FR, de-DE, pt-BR, zh-CN, ja-JP, ar-SA.
+
+**Reference:** https://learn.microsoft.com/en-us/power-bi/developer/visuals/localization
 
 ---
 
 ## Implementation Priority
 
-| Phase | Priority | Effort | Impact | Dependencies |
-|-------|----------|--------|--------|--------------|
-| 1 - Settings Decomposition | HIGH | Medium | High | None |
-| 2 - Visual.ts Decomposition | HIGH | High | High | Phase 1 |
-| 3 - Type Improvements | MEDIUM | Low | Medium | None |
-| 4 - Service Consolidation | MEDIUM | Medium | Medium | Phase 1, 2 |
-| 5 - Orchestrator Refactoring | LOW | Medium | Medium | Phase 2, 4 |
-| 6 - Testing Infrastructure | MEDIUM | Medium | High | Phase 1, 2 |
+| Feature | Effort | Impact | Priority | Accessibility |
+|---------|--------|--------|----------|---------------|
+| Allow Interactions | Low | Medium | 1 | No |
+| Keyboard Navigation | Medium | High | 2 | ✅ Yes |
+| High Contrast | Medium | High | 3 | ✅ Yes |
+| Context Menu | Medium | High | 4 | No |
+| Landing Page | Medium | Medium | 5 | No |
+| Color Palette | Low | Low | 6 | No |
+| Localizations | High | Medium | 7 | ✅ Yes (i18n) |
 
 ---
 
-## Quick Wins (Can Start Immediately)
+## Phased Implementation Plan
 
-1. ✅ **Fix typo:** `proportalCircles` → `proportionalCircles` throughout codebase - DONE (commit d4e7589)
-2. ✅ **Extract constants:** Move magic numbers to `constants/defaults.ts` - DONE (commit d4e7589)
-   - Created `src/constants/defaults.ts` with organized default values
-   - ProportionalCirclesDefaults, ChoroplethDefaults, LegendContainerDefaults, etc.
-3. ✅ **Add JSDoc comments:** Document public APIs in services - DONE (commit 0f2fdda)
-   - MapService, OptionsService, CacheService, LegendService, MessageService, DataRoleService
-4. ✅ **Create type guards:** Add runtime type validation for external data - DONE (commit 86457c6)
-   - Created `src/types/guards.ts` with comprehensive type guards
-   - GeoJSON/TopoJSON validation, options validation, metadata validation
-5. ✅ **Consolidate imports:** Create barrel exports for each directory - DONE (commit 0f2fdda)
-   - src/constants/index.ts, src/services/index.ts, src/orchestration/index.ts, src/utils/index.ts
+### Phase 1: Quick Accessibility Wins (Est: 2-3 hours) ✅ COMPLETED
+- [x] Add `allowInteractions` flag checking
+- [x] Add `supportsKeyboardFocus: true` to capabilities.json
+- [ ] Basic keyboard navigation (Enter/Tab on data points) - Deferred to Phase 1.5
 
----
+**Completed Changes:**
+- Added `allowInteractions` property to `LayerOptions` interface
+- Added `setAllowInteractions()` method to `CircleLayerOptionsBuilder` and `ChoroplethLayerOptionsBuilder`
+- Added `setAllowInteractions()` method to `CircleOrchestrator` and `ChoroplethOrchestrator`
+- Updated `visual.ts` to read `hostCapabilities.allowInteractions` and pass to orchestrators
+- Wrapped all click handlers in `choroplethLayer.ts` (1 location) with `allowInteractions` check
+- Wrapped all click handlers in `circleLayer.ts` (4 locations) with `allowInteractions` check
+- Added `supportsKeyboardFocus: true` to `capabilities.json`
 
-## File Size Targets After Refactoring
+**Build Result:** 2 warnings resolved (Allow Interactions, Keyboard Navigation). 5 warnings remaining.
 
-| File | Current | Target | Strategy |
-|------|---------|--------|----------|
-| settings.ts | 1539 lines | <100 lines | Split into 12+ modules |
-| visual.ts | 519 lines | <150 lines | Delegate to services |
-| ChoroplethOrchestrator.ts | 611 lines | <300 lines | Extract data prep |
-| CircleOrchestrator.ts | 314 lines | <200 lines | Extract common logic |
+### Phase 2: Context Menu (Est: 2-3 hours) ✅ COMPLETED
+- [x] Implement context menu handlers for choropleth layer
+- [x] Implement context menu handlers for circle layer (all 4 click handlers)
+- [x] Implement context menu handler for empty map background
 
----
+**Completed Changes:**
+- Added contextmenu handler in `choroplethLayer.ts` alongside existing click handler
+- Added contextmenu handlers to all 4 circle types in `circleLayer.ts` (donut arcs, pie arcs, circle1, circle2)
+- Added contextmenu handler in `visual.ts` for map background (empty space)
+- All handlers call `selectionManager.showContextMenu()` with appropriate selection IDs
 
-## Next Steps
+**Build Result:** 1 more warning resolved. 4 warnings remaining.
 
-1. [ ] Create feature branch: `refactor/settings-decomposition`
-2. [ ] Start with Phase 1.1: Create settings directory structure
-3. [ ] Migrate one settings group at a time with tests
-4. [ ] Ensure build passes after each migration
-5. [ ] Update imports in visual.ts progressively
+### Phase 3: Landing Page (Est: 2-3 hours) ✅ COMPLETED
+- [x] Enable landing page in capabilities.json
+- [x] Create landing page HTML/CSS
+- [x] Handle show/hide logic in update method
+- [x] Use SVG icon from assets folder
+- [x] Responsive design for default Power BI viewport size
 
----
+**Completed Changes:**
+- Added `supportsLandingPage: true` to `capabilities.json`
+- Created landing page methods in `DOMManager.ts`: `showLandingPage()`, `hideLandingPage()`, `isLandingPageShown()`
+- Used DOM creation methods (not innerHTML) for security compliance
+- Used inline SVG created via `createElementNS()` (Power BI sandbox blocks data URLs for img src)
+- Inline SVG uses the ROSEA logo paths from `assets/icon.svg` with `#009edb` fill color
+- Added landing page styles in `style/visual.less` optimized for small default viewport (~200x200)
+- Reduced padding, margins, and font sizes for compact display
+- Updated `visual.ts` to show/hide landing page based on data availability
 
-## Completed Work Log
+**Build Result:** 1 more warning resolved. 3 warnings remaining (High Contrast, Color Palette, Localizations).
 
-### Quick Wins - Completed December 2025
+### Phase 4: High Contrast (Est: 3-4 hours) ✅ COMPLETED
+- [x] High contrast mode detection using `ISandboxExtendedColorPalette`
+- [x] High contrast color application to choropleth and circle layers
+- [x] Selection highlighting in high contrast mode
 
-- **Commit d4e7589**: Fixed `proportalCircles` → `proportionalCircles` typo in settings.ts and OptionsService.ts
-- **Commit d4e7589**: Created `src/constants/defaults.ts` with extracted magic numbers
-  - Build verified: `pbiviz package` SUCCESS
-  - Tests verified: 64 suites, 210 tests PASSED
-- **Commit 0f2fdda**: Added JSDoc comments to public APIs
-  - MapService, OptionsService, CacheService, LegendService, MessageService, DataRoleService
-- **Commit 0f2fdda**: Created barrel exports (index.ts) for all major directories
-  - src/constants/, src/services/, src/orchestration/, src/utils/
-- **Commit 86457c6**: Created type guards for runtime validation
-  - Created `src/types/guards.ts` with 15+ type guard functions
-  - GeoJSON validation, TopoJSON validation, options validation, metadata validation
-  - Build verified: `pbiviz package` SUCCESS
-  - Tests verified: 64 suites, 210 tests PASSED
+**Completed Changes:**
+- Added `HighContrastColors` interface to `src/types/index.ts`
+- Added `isHighContrast` and `highContrastColors` properties to `LayerOptions` interface
+- Updated `visual.ts` to detect high contrast mode via `colorPalette.isHighContrast`
+- Added `setHighContrast()` method to `BaseOrchestrator` with overrides in child orchestrators
+- Updated `LayerOptionBuilders` to include `setHighContrast()` method
+- Modified `choroplethLayer.ts` render() to use high contrast colors:
+  - Foreground color for data fills
+  - Background color for strokes
+  - ForegroundSelected for selected items
+  - Minimum 2px stroke width in HC mode
+- Modified `circleLayer.ts` render() to use high contrast colors:
+  - Foreground color for primary circles
+  - Hyperlink color for secondary circles (visual differentiation)
+  - Background color for strokes
+  - Minimum 2px stroke width in HC mode
 
-### All Quick Wins Complete ✅
+**Build Result:** 1 more warning resolved. 2 warnings remaining (Color Palette, Localizations).
 
----
+**UPDATE:** After full build verification, only **1 warning remains** (Localizations). Color Palette warning was resolved as part of high contrast implementation using `ISandboxExtendedColorPalette`.
 
-### Phase 1: Settings Decomposition - Completed December 2025 ✅
+### Phase 5: Color Palette Integration (Est: 1-2 hours) ✅ RESOLVED
+- [ ] Use color palette for default colors
+- [ ] Integrate with existing color customization
 
-- **Commit 8b9e390**: Decomposed monolithic settings.ts into modular structure
-  - Created `src/settings/` directory with groups/ and cards/ subdirectories
-  - Extracted 12+ settings group classes into individual files
-  - Created barrel exports for clean imports
-  - Reduced settings.ts complexity significantly
-  - Build verified: SUCCESS | Tests: 210/210 PASSED
-
----
-
-### Phase 2: Visual.ts Decomposition - Completed December 2025 ✅
-
-- **Commit 2b0d164**: Extracted core services from visual.ts
-  - Created `src/services/DOMManager.ts` - DOM element management (321 lines)
-  - Created `src/services/StateManager.ts` - State persistence (109 lines)
-  - Reduced visual.ts to pure coordination role
-  - Build verified: SUCCESS | Tests: 210/210 PASSED
-
----
-
-### Phase 3: UniqueClassificationService Extraction - Completed December 2025 ✅
-
-- **Commit f01dd28**: Extracted unique classification from ChoroplethOrchestrator
-  - Created `src/services/UniqueClassificationService.ts` (246 lines)
-    - Stable color mapping for unique/categorical classification
-    - Maintains persistent category-to-color mappings across filtering
-    - Handles both numeric and text-based categorical values
-  - Reduced ChoroplethOrchestrator from 611 → 422 lines (31% reduction)
-  - Build verified: SUCCESS | Tests: 210/210 PASSED
+### Phase 6: Localizations (Est: 8-16 hours)
+- [ ] Create string resources structure
+- [ ] Add displayNameKey to capabilities.json
+- [ ] Implement localizationManager usage
+- [ ] Translate key strings for priority languages
 
 ---
 
-### Bug Fix: GeoBoundaries URLs - Completed December 2025 ✅
+## Testing Checklist
 
-- **Commit 4f31b05**: Fixed 404 error for GeoBoundaries data
-  - Corrected URLs from `IM4SEA/geoboundaries-lite` to `maplumi/geoboundaries-lite`
-  - Updated 4 URLs in VisualConfig.ts
-  - Verified with HEAD request: HTTP 200 OK
-  - Build verified: SUCCESS | Tests: 210/210 PASSED
+### Allow Interactions
+- [ ] Visual is interactive in report view
+- [ ] Visual is non-interactive on dashboard tiles (no click/select)
+- [ ] Tooltips still work in non-interactive mode
 
----
+### Context Menu
+- [ ] Right-click on empty space shows basic menu
+- [ ] Right-click on choropleth region shows data point menu
+- [ ] Right-click on circle shows data point menu
+- [ ] Menu works in both Canvas and WebGL modes
 
-### Phase 4: JSDoc Documentation - Completed December 2025 ✅
+### High Contrast
+- [x] Visual detects high contrast mode (implemented via ISandboxExtendedColorPalette)
+- [x] Choropleth uses foreground/background colors (foreground for fills, background for strokes)
+- [x] Circles use foreground color (foreground for primary, hyperlink for secondary)
+- [x] Selected items use foregroundSelected color
+- [ ] Legend adapts to high contrast theme (colors from layer options already applied)
+- [ ] Test with all Windows high contrast themes
 
-- **Commit 4bce4df**: Added comprehensive JSDoc to orchestrators
-  - BaseOrchestrator: Class-level docs, constructor, all utility methods
-  - MapToolsOrchestrator: Class-level docs, constructor, attach/detach
-  - CircleOrchestrator: Class-level docs with example, all public/private methods
-  - ChoroplethOrchestrator: Class-level docs with example, all methods
-  - Key services already had JSDoc (DOMManager, StateManager, UniqueClassificationService, LegendService)
-  - Build verified: SUCCESS | Tests: 210/210 PASSED
+### Keyboard Navigation
+- [ ] Tab navigates through data points
+- [ ] Enter/Space selects data point
+- [ ] Escape exits visual focus
+- [ ] Focus indicator is visible
 
----
+### Landing Page
+- [ ] Shows when no data fields are added
+- [ ] Hides when data is added
+- [ ] Instructions are clear and helpful
 
-## Refactoring Progress Summary
+### Color Palette
+- [ ] Default colors come from Power BI theme
+- [ ] User-specified colors override palette
 
-| Phase | Description | Status | Commit | Lines Changed |
-|-------|-------------|--------|--------|---------------|
-| Quick Wins | Typos, constants, JSDoc, guards | ✅ | d4e7589, 0f2fdda, 86457c6 | +500 |
-| Phase 1 | Settings decomposition | ✅ | 8b9e390 | +1200/-1000 |
-| Phase 2 | Visual.ts decomposition | ✅ | 2b0d164 | +430/-200 |
-| Phase 3 | UniqueClassificationService | ✅ | f01dd28 | +246/-189 |
-| Bug Fix | GeoBoundaries URLs | ✅ | 4f31b05 | +4/-4 |
-| Phase 4 | JSDoc documentation | ✅ | 4bce4df | +292/-17 |
-| Phase 5 | Type improvements & testing | 🔄 | - | - |
+### Localizations
+- [ ] UI text changes with Power BI language setting
+- [ ] Data role names localized in field well
+- [ ] Settings pane labels localized
 
 ---
 
 ## Notes
 
-- All refactoring should be backward compatible
-- Maintain existing test coverage during refactoring
-- Run `npm test` and `pbiviz package` after each change
-- Document any breaking changes in CHANGELOG.md
+- All changes should maintain backward compatibility
+- Run `npm test` and `pbiviz package` after each phase
+- Focus on accessibility features first (High Contrast, Keyboard Navigation) as these are important for enterprise deployments and AppSource certification
+- Localizations can be deferred to a later release if time-constrained
+- API version requirement: Most features require API 2.1.0+ (current visual uses 5.11.0, so compatible)

@@ -7,6 +7,7 @@ import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import { LegendService } from "../services/LegendService";
 import { VisualConfig } from "../config/VisualConfig";
 import { MessageService } from "../services/MessageService";
+import { HighContrastColors } from "../types";
 
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
@@ -70,6 +71,10 @@ export abstract class BaseOrchestrator {
     protected tooltipServiceWrapper: ITooltipServiceWrapper;
     /** Message service for displaying warnings and errors to users */
     protected messages: MessageService;
+    /** Whether high contrast mode is enabled */
+    protected isHighContrast: boolean = false;
+    /** High contrast colors from Power BI (null if not in high contrast mode) */
+    protected highContrastColors: HighContrastColors | null = null;
 
     /**
      * Creates a new orchestrator instance.
@@ -86,6 +91,18 @@ export abstract class BaseOrchestrator {
         this.selectionManager = args.selectionManager;
         this.tooltipServiceWrapper = args.tooltipServiceWrapper;
         this.messages = new MessageService(this.host);
+    }
+
+    /**
+     * Sets high contrast mode state and colors.
+     * Should be called from visual.ts update() when high contrast mode changes.
+     * 
+     * @param isHighContrast - Whether high contrast mode is enabled
+     * @param colors - High contrast colors from Power BI (null if not in high contrast mode)
+     */
+    public setHighContrast(isHighContrast: boolean, colors: HighContrastColors | null): void {
+        this.isHighContrast = isHighContrast;
+        this.highContrastColors = colors;
     }
 
     /**
