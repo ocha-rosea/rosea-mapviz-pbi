@@ -296,7 +296,7 @@ class proportionalCirclesDisplaySettingsGroup extends formattingSettings.SimpleC
         }
     });
 
-    name: string = "proportalCirclesDisplaySettingsGroup";
+    name: string = "proportionalCirclesDisplaySettingsGroup";
     displayName: string = "Display";
     collapsible: boolean = false;
     slices: formattingSettings.Slice[] = [
@@ -463,7 +463,7 @@ class proportionalCirclesLegendSettingsGroup extends formattingSettings.SimpleCa
         }
     });
 
-    name: string = "proportalCirclesLegendSettingsGroup";
+    name: string = "proportionalCirclesLegendSettingsGroup";
     displayName: string = "Legend";
     collapsible: boolean = false;
     slices: formattingSettings.Slice[] = [
@@ -491,13 +491,13 @@ class proportionalCirclesVisualCardSettings extends formattingSettings.Composite
         value: true
     });
 
-    public proportalCirclesDisplaySettingsGroup = new proportionalCirclesDisplaySettingsGroup();
-    public proportionalCircleLegendSettingsGroup = new proportionalCirclesLegendSettingsGroup();
+    public proportionalCirclesDisplaySettingsGroup = new proportionalCirclesDisplaySettingsGroup();
+    public proportionalCirclesLegendSettingsGroup = new proportionalCirclesLegendSettingsGroup();
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.showLayerControl;
     name: string = "proportionalCirclesVisualCardSettings";
     displayName: string = "Scaled Circles";
-    groups: formattingSettings.Group[] = [this.proportalCirclesDisplaySettingsGroup, this.proportionalCircleLegendSettingsGroup];
+    groups: formattingSettings.Group[] = [this.proportionalCirclesDisplaySettingsGroup, this.proportionalCirclesLegendSettingsGroup];
 
 }
 
