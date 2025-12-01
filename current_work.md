@@ -374,6 +374,75 @@ export abstract class BaseOrchestrator<TOptions, TLayer extends IMapLayer> {
 
 ---
 
+### Phase 1: Settings Decomposition - Completed December 2025 ✅
+
+- **Commit 8b9e390**: Decomposed monolithic settings.ts into modular structure
+  - Created `src/settings/` directory with groups/ and cards/ subdirectories
+  - Extracted 12+ settings group classes into individual files
+  - Created barrel exports for clean imports
+  - Reduced settings.ts complexity significantly
+  - Build verified: SUCCESS | Tests: 210/210 PASSED
+
+---
+
+### Phase 2: Visual.ts Decomposition - Completed December 2025 ✅
+
+- **Commit 2b0d164**: Extracted core services from visual.ts
+  - Created `src/services/DOMManager.ts` - DOM element management (321 lines)
+  - Created `src/services/StateManager.ts` - State persistence (109 lines)
+  - Reduced visual.ts to pure coordination role
+  - Build verified: SUCCESS | Tests: 210/210 PASSED
+
+---
+
+### Phase 3: UniqueClassificationService Extraction - Completed December 2025 ✅
+
+- **Commit f01dd28**: Extracted unique classification from ChoroplethOrchestrator
+  - Created `src/services/UniqueClassificationService.ts` (246 lines)
+    - Stable color mapping for unique/categorical classification
+    - Maintains persistent category-to-color mappings across filtering
+    - Handles both numeric and text-based categorical values
+  - Reduced ChoroplethOrchestrator from 611 → 422 lines (31% reduction)
+  - Build verified: SUCCESS | Tests: 210/210 PASSED
+
+---
+
+### Bug Fix: GeoBoundaries URLs - Completed December 2025 ✅
+
+- **Commit 4f31b05**: Fixed 404 error for GeoBoundaries data
+  - Corrected URLs from `IM4SEA/geoboundaries-lite` to `maplumi/geoboundaries-lite`
+  - Updated 4 URLs in VisualConfig.ts
+  - Verified with HEAD request: HTTP 200 OK
+  - Build verified: SUCCESS | Tests: 210/210 PASSED
+
+---
+
+### Phase 4: JSDoc Documentation - Completed December 2025 ✅
+
+- **Commit 4bce4df**: Added comprehensive JSDoc to orchestrators
+  - BaseOrchestrator: Class-level docs, constructor, all utility methods
+  - MapToolsOrchestrator: Class-level docs, constructor, attach/detach
+  - CircleOrchestrator: Class-level docs with example, all public/private methods
+  - ChoroplethOrchestrator: Class-level docs with example, all methods
+  - Key services already had JSDoc (DOMManager, StateManager, UniqueClassificationService, LegendService)
+  - Build verified: SUCCESS | Tests: 210/210 PASSED
+
+---
+
+## Refactoring Progress Summary
+
+| Phase | Description | Status | Commit | Lines Changed |
+|-------|-------------|--------|--------|---------------|
+| Quick Wins | Typos, constants, JSDoc, guards | ✅ | d4e7589, 0f2fdda, 86457c6 | +500 |
+| Phase 1 | Settings decomposition | ✅ | 8b9e390 | +1200/-1000 |
+| Phase 2 | Visual.ts decomposition | ✅ | 2b0d164 | +430/-200 |
+| Phase 3 | UniqueClassificationService | ✅ | f01dd28 | +246/-189 |
+| Bug Fix | GeoBoundaries URLs | ✅ | 4f31b05 | +4/-4 |
+| Phase 4 | JSDoc documentation | ✅ | 4bce4df | +292/-17 |
+| Phase 5 | Type improvements & testing | 🔄 | - | - |
+
+---
+
 ## Notes
 
 - All refactoring should be backward compatible

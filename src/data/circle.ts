@@ -1,18 +1,38 @@
 "use strict";
 import { RoleNames } from "../constants/roles";
+import { DataViewMeasure } from "../types";
 
+/**
+ * Result of parsing circle categorical data.
+ */
 export interface CircleParseResult {
+    /** Array of longitude values */
     longitudes?: number[];
+    /** Array of latitude values */
     latitudes?: number[];
-    circleSizeValuesObjects: any[];
+    /** Array of size measure objects */
+    circleSizeValuesObjects: DataViewMeasure[];
+    /** Whether longitude data role is present */
     hasLon?: boolean;
+    /** Whether latitude data role is present */
     hasLat?: boolean;
 }
 
-export function parseCircleCategorical(categorical: any): CircleParseResult {
-    const lonCategory = categorical?.categories?.find((c: any) => c.source?.roles?.[RoleNames.Longitude]);
-    const latCategory = categorical?.categories?.find((c: any) => c.source?.roles?.[RoleNames.Latitude]);
-    const circleSizeValuesObjects = categorical?.values?.filter((c: any) => c.source?.roles?.[RoleNames.Size]) || [];
+/**
+ * Parses Power BI categorical data to extract circle-specific fields.
+ * @param categorical - Power BI categorical data
+ * @returns Parsed circle data with coordinates and size measures
+ */
+export function parseCircleCategorical(categorical: powerbi.DataViewCategorical | undefined): CircleParseResult {
+    const lonCategory = categorical?.categories?.find(
+        (c) => c.source?.roles?.[RoleNames.Longitude]
+    );
+    const latCategory = categorical?.categories?.find(
+        (c) => c.source?.roles?.[RoleNames.Latitude]
+    );
+    const circleSizeValuesObjects = (categorical?.values?.filter(
+        (c) => c.source?.roles?.[RoleNames.Size]
+    ) || []) as DataViewMeasure[];
 
     return {
         longitudes: lonCategory?.values as number[] | undefined,

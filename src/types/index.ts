@@ -16,6 +16,90 @@ import { Feature } from 'ol';
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionId = powerbi.visuals.ISelectionId;
 
+// ============================================================================
+// Power BI Categorical Data Types
+// ============================================================================
+
+/**
+ * Represents a Power BI data category with values and source metadata.
+ * Used for dimension fields like PCode, Longitude, Latitude.
+ */
+export interface DataViewCategory {
+    /** Array of category values */
+    values: (string | number | boolean | null)[];
+    /** Source column metadata */
+    source: {
+        /** Display name in Power BI */
+        displayName: string;
+        /** Query name for selection IDs */
+        queryName: string;
+        /** Data role assignments */
+        roles?: Record<string, boolean>;
+        /** Format string for values */
+        format?: string;
+    };
+}
+
+/**
+ * Represents a Power BI data measure with values and aggregation metadata.
+ * Used for measure fields like Color, Size.
+ */
+export interface DataViewMeasure {
+    /** Array of measure values */
+    values: (number | null)[];
+    /** Source column metadata */
+    source: {
+        /** Display name in Power BI */
+        displayName: string;
+        /** Query name for selection IDs */
+        queryName: string;
+        /** Data role assignments */
+        roles?: Record<string, boolean>;
+        /** Format string for values */
+        format?: string;
+    };
+}
+
+// ============================================================================
+// Data Point Types
+// ============================================================================
+
+/**
+ * Represents a single data point for choropleth visualization.
+ */
+export interface ChoroplethDataPoint {
+    /** P-Code or boundary identifier */
+    pcode: string;
+    /** Numeric value for color mapping */
+    value: number;
+    /** Tooltip items for hover display */
+    tooltip: VisualTooltipDataItem[];
+    /** Power BI selection ID for cross-filtering */
+    selectionId: ISelectionId;
+}
+
+/**
+ * Represents a single data point for circle visualization.
+ */
+export interface CircleDataPoint {
+    /** Longitude coordinate */
+    longitude: number;
+    /** Latitude coordinate */
+    latitude: number;
+    /** Tooltip items for hover display */
+    tooltip: VisualTooltipDataItem[];
+    /** Power BI selection ID for cross-filtering */
+    selectionId: ISelectionId;
+}
+
+// ============================================================================
+// Map State Types
+// ============================================================================
+
+// ============================================================================
+// Map State Types
+// ============================================================================
+
 export interface MapState {
     basemapType: string;
     attribution: string;
@@ -57,21 +141,29 @@ export interface LayerOptions extends OlLayerOptions {
 export interface CircleData {
     longitudes: number[] | undefined;
     latitudes: number[] | undefined;
-    circleSizeValuesObjects: any[];
+    circleSizeValuesObjects: DataViewMeasure[];
 }
 
 export interface ChoroplethData {
-    AdminPCodeNameIDCategory: any;
-    colorMeasure: any;
+    /** Category containing P-Code/boundary ID values */
+    AdminPCodeNameIDCategory: DataViewCategory | undefined;
+    /** Measure containing color values */
+    colorMeasure: DataViewMeasure | undefined;
+    /** Array of P-Code strings */
     pCodes: string[] | undefined;
 }
 
 export interface ChoroplethDataSet {
+    /** Array of numeric values for color mapping */
     colorValues: number[];
-    classBreaks: any;
-    colorScale: any;
+    /** Classification break points */
+    classBreaks: number[];
+    /** Color scale array or function */
+    colorScale: string[] | ((value: number) => string);
+    /** Property key for matching features to data */
     pcodeKey: string;   
-    dataPoints: any[];
+    /** Array of data points with selection IDs */
+    dataPoints: ChoroplethDataPoint[];
 }
 
 export interface CircleLayerOptions extends LayerOptions {
