@@ -1,0 +1,37 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "jsdom",
+  "testMatch": [
+    "**/tests/**/*.test.ts",
+    "**/tests/**/*.integration.test.ts"
+  ],
+  "setupFilesAfterEnv": ["<rootDir>/tests/setup.ts"],
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/*.d.ts"
+  ],
+  "coverageDirectory": "coverage",
+  "coverageReporters": [
+    "json-summary",
+    "text",
+    "lcov"
+  ],
+  "transform": {
+    "^.+\\.(ts|tsx)$": "ts-jest",
+    "^.+\\.(mjs|js|cjs|jsx)$": "babel-jest"
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!ol|ol-mapbox-style|d3|d3-.*)/"
+  ],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+  "\\.(css|less|sass|scss)$": "identity-obj-proxy",
+  "^punycode$": "punycode/"
+  },
+  "globals": {
+    "ts-jest": {
+      "tsconfig": "<rootDir>/tests/tsconfig.json",
+      "isolatedModules": true
+    }
+  }
+}
