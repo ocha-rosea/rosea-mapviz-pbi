@@ -131,17 +131,18 @@ describe('ChoroplethOrchestrator unique classification palette handling', () => 
     expect(result.classBreaks).toEqual([3, 4, 5]);
     expect(result.colorScale).toEqual([palette[2], palette[3], palette[4]]);
 
-    const stableOrder = (orchestrator as any).categoricalStableOrder;
+    const uniqueService = (orchestrator as any).uniqueClassification;
+    const stableOrder = (uniqueService as any).categoricalStableOrder;
     expect(stableOrder).toEqual([1, 2, 3, 4, 5]);
 
-    const colorMap: Map<number, string> = (orchestrator as any).categoricalColorMap;
+    const colorMap: Map<number, string> = (uniqueService as any).categoricalColorMap;
     expect(colorMap.get(1)).toBe(palette[0]);
     expect(colorMap.get(2)).toBe(palette[1]);
     expect(colorMap.get(3)).toBe(palette[2]);
     expect(colorMap.get(4)).toBe(palette[3]);
     expect(colorMap.get(5)).toBe(palette[4]);
 
-    const numericRange = (orchestrator as any).numericPlaceholderRange;
+    const numericRange = (uniqueService as any).numericPlaceholderRange;
     expect(numericRange).toEqual({ start: 1, slots: 5 });
   });
 
@@ -154,10 +155,11 @@ describe('ChoroplethOrchestrator unique classification palette handling', () => 
     expect(result.classBreaks).toEqual([3, 4, 5]);
     expect(result.colorScale).toEqual([palette[2], palette[3], palette[4]]);
 
-    const colorMap: Map<number, string> = (orchestrator as any).categoricalColorMap;
+    const uniqueService = (orchestrator as any).uniqueClassification;
+    const colorMap: Map<number, string> = (uniqueService as any).categoricalColorMap;
     expect(colorMap.get(6)).toBe('#000000');
 
-    const numericRange = (orchestrator as any).numericPlaceholderRange;
+    const numericRange = (uniqueService as any).numericPlaceholderRange;
     expect(numericRange).toEqual({ start: 1, slots: 5 });
   });
 
@@ -170,10 +172,11 @@ describe('ChoroplethOrchestrator unique classification palette handling', () => 
     expect(result.classBreaks).toEqual([2, 3, 4, 5]);
     expect(result.colorScale).toEqual([palette[1], palette[2], palette[3], palette[4]]);
 
-    const stableOrder = (orchestrator as any).categoricalStableOrder;
+    const uniqueService = (orchestrator as any).uniqueClassification;
+    const stableOrder = (uniqueService as any).categoricalStableOrder;
     expect(stableOrder).toEqual([1, 2, 3, 4, 5]);
 
-    const numericRange = (orchestrator as any).numericPlaceholderRange;
+    const numericRange = (uniqueService as any).numericPlaceholderRange;
     expect(numericRange).toEqual({ start: 1, slots: 5 });
   });
 });

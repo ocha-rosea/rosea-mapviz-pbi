@@ -29,3 +29,5 @@ export { DOMManager } from "./DOMManager";
 export type { DOMElements, LegendPositionConfig } from "./DOMManager";
 export { StateManager } from "./StateManager";
 export type { StateManagerConfig } from "./StateManager";
+export { UniqueClassificationService } from "./UniqueClassificationService";
+export type { UniqueClassificationResult, UniqueClassificationConfig } from "./UniqueClassificationService";

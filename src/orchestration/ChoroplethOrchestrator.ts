@@ -23,19 +23,27 @@ import { ChoroplethLayerOptionsBuilder } from "../services/LayerOptionBuilders";
 import { filterValidPCodes, parseChoroplethCategorical, validateChoroplethInput } from "../data/choropleth";
 import { MessageService } from "../services/MessageService";
 import { ChoroplethCanvasLayer } from "../layers/canvas/choroplethCanvasLayer";
+import { UniqueClassificationService } from "../services/UniqueClassificationService";
 
+/**
+ * Orchestrator for choropleth (filled polygon) visualizations.
+ * 
+ * Coordinates data fetching, boundary resolution, color mapping, and layer rendering
+ * for choropleth maps. Handles multiple boundary data sources including GeoBoundaries
+ * API and custom TopoJSON/GeoJSON URLs.
+ * 
+ * @example
+ * ```typescript
+ * const orchestrator = new ChoroplethOrchestrator({ svg, map, host, ... });
+ * await orchestrator.render(categorical, choroplethOptions, dataService, mapToolsOptions);
+ * ```
+ */
 export class ChoroplethOrchestrator extends BaseOrchestrator {
     private cacheService: CacheService;
-
     private choroplethLayer: ChoroplethLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined;
     private abortController: AbortController | null = null;
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
-    // Persistent categorical mapping (stable category->color across filtering) for Unique classification
-    private categoricalColorMap: globalThis.Map<any, string> = new globalThis.Map();
-    private categoricalStableOrder: any[] = []; // first 7 sorted categories (stable across filtering until measure/method change)
-    private numericPlaceholderRange: { start: number; slots: number } | undefined;
-    private lastClassificationMethod: string | undefined;
-    private lastMeasureQueryName: string | undefined;
+    private uniqueClassification: UniqueClassificationService;
 
     constructor(args: {
         svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
@@ -51,6 +59,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         super(args);
         this.cacheService = args.cacheService;
         this.messages = new MessageService(this.host);
+        this.uniqueClassification = new UniqueClassificationService();
         this.choroplethOptsBuilder = new ChoroplethLayerOptionsBuilder({
             svg: this.svg,
             svgContainer: this.svgContainer,
@@ -148,9 +157,9 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         pCodes: string[],
         dataService: ChoroplethDataService
     ): ChoroplethDataSet {
-    const colorValues: number[] = colorMeasure.values;
-    let classBreaks = dataService.getClassBreaks(colorValues, choroplethOptions);
-    let colorScale = dataService.getColorScale(classBreaks as any, choroplethOptions);
+        const colorValues: number[] = colorMeasure.values;
+        let classBreaks = dataService.getClassBreaks(colorValues, choroplethOptions);
+        let colorScale = dataService.getColorScale(classBreaks as any, choroplethOptions);
         const pcodeKey = choroplethOptions.locationPcodeNameId;
         const tooltips = dataService.extractTooltips(categorical);
         const dataPoints = pCodes.map((pcode, i) => {
@@ -160,47 +169,27 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 .createSelectionId();
             return { pcode, value: colorValues[i], tooltip: tooltips[i], selectionId };
         });
-        // Stable ordered categorical mapping for Unique classification
+
+        // Apply unique classification with stable color mapping
         if (choroplethOptions.classificationMethod === ClassificationMethods.Unique) {
-            try {
-                const measureQuery = colorMeasure?.source?.queryName;
-                const enteringUnique = this.lastClassificationMethod !== ClassificationMethods.Unique;
-                const measureChanged = measureQuery && measureQuery !== this.lastMeasureQueryName;
-
-                const currentUnique = Array.from(new Set(colorValues.filter(v => v !== null && v !== undefined && !Number.isNaN(v))));
-                const allNumeric = currentUnique.every(v => typeof v === "number");
-                const sortedCurrent = allNumeric
-                    ? [...currentUnique].sort((a, b) => (a as number) - (b as number))
-                    : [...currentUnique].sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: "base" }));
-
-                const requestedClasses = choroplethOptions.classes && choroplethOptions.classes > 0
-                    ? choroplethOptions.classes
-                    : sortedCurrent.length;
-                const maxLegendItems = Math.min(requestedClasses || sortedCurrent.length || 0, 7);
-                const basePalette = this.ensurePaletteArray(colorScale, maxLegendItems);
-
-                if (maxLegendItems === 0) {
-                    this.clearUniqueState();
-                } else if (allNumeric) {
-                    this.applyNumericUniquePalette(sortedCurrent as number[], basePalette, maxLegendItems, enteringUnique || measureChanged);
-                } else {
-                    this.applyTextUniquePalette(sortedCurrent, basePalette, maxLegendItems, enteringUnique || measureChanged);
+            const result = this.uniqueClassification.applyStableMapping(
+                colorValues,
+                colorScale,
+                {
+                    classificationMethod: choroplethOptions.classificationMethod,
+                    classes: choroplethOptions.classes,
+                    measureQueryName: colorMeasure?.source?.queryName
                 }
-
-                const presentStable = this.categoricalStableOrder.filter(c => currentUnique.includes(c));
-                classBreaks = presentStable;
-                colorScale = presentStable.map(c => this.categoricalColorMap.get(c) || "#000000");
+            );
+            if (result.stableOrderingApplied) {
+                classBreaks = result.classBreaks;
+                colorScale = result.colorScale;
                 (choroplethOptions as any)._stableUniqueCategories = classBreaks;
                 (choroplethOptions as any)._stableUniqueColors = colorScale;
-            } catch (e) {
-                
-                this.categoricalColorMap.clear();
-                this.categoricalStableOrder = [];
             }
-        } else if (this.lastClassificationMethod === ClassificationMethods.Unique) {
-            this.categoricalColorMap.clear();
-            this.categoricalStableOrder = [];
-            this.numericPlaceholderRange = undefined;
+        } else {
+            // Clear unique state when switching to other methods
+            this.uniqueClassification.clearStateIfNotUnique(choroplethOptions.classificationMethod);
         }
 
         // Single-value numeric collapse: if non-categorical and only one distinct numeric value, force one color & two identical breaks
@@ -216,9 +205,6 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 }
             } catch (e) { }
         }
-
-        this.lastClassificationMethod = choroplethOptions.classificationMethod;
-        this.lastMeasureQueryName = colorMeasure?.source?.queryName;
 
         return { colorValues, classBreaks, colorScale, pcodeKey, dataPoints } as any;
     }
@@ -432,179 +418,5 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             const extent = anyLayer?.getFeaturesExtent?.();
             if (extent) this.map.getView().fit(extent, VisualConfig.MAP.FIT_OPTIONS);
         }
-    }
-
-    private ensurePaletteArray(colorScale: any, length: number): string[] {
-        const source = Array.isArray(colorScale)
-            ? (colorScale as string[])
-            : Object.values(colorScale ?? {}) as string[];
-        const result = source.slice(0, Math.max(length, 0));
-        while (result.length < length) {
-            result.push("#000000");
-        }
-        return result;
-    }
-
-    private clearUniqueState(): void {
-        this.categoricalColorMap.clear();
-        this.categoricalStableOrder = [];
-        this.numericPlaceholderRange = undefined;
-    }
-
-    private applyNumericUniquePalette(
-        values: number[],
-        palette: string[],
-        maxSlots: number,
-        forceRebuild: boolean
-    ): void {
-        if (values.length === 0) {
-            this.clearUniqueState();
-            return;
-        }
-
-        const start = this.computeNumericRangeStart(values, maxSlots, forceRebuild);
-        const needsRebuild = forceRebuild
-            || !this.numericPlaceholderRange
-            || this.numericPlaceholderRange.start !== start
-            || this.numericPlaceholderRange.slots !== maxSlots;
-
-        if (needsRebuild) {
-            this.initializeNumericPlaceholderRange(start, maxSlots, palette);
-        } else {
-            this.applyPaletteToNumericRange(palette);
-        }
-
-        const range = this.numericPlaceholderRange!;
-        values.forEach(value => {
-            if (value >= range.start && value < range.start + range.slots) {
-                const offset = value - range.start;
-                this.categoricalColorMap.set(value, palette[offset] || "#000000");
-            } else {
-                this.categoricalColorMap.set(value, "#000000");
-            }
-        });
-    }
-
-    private computeNumericRangeStart(values: number[], maxSlots: number, forceRebuild: boolean): number {
-        const newMin = values[0];
-        const newMax = values[values.length - 1];
-
-        if (maxSlots <= 0) {
-            return newMin;
-        }
-
-        const previous = this.numericPlaceholderRange;
-        const ordinalLock = this.shouldPreferOrdinalBase(values, maxSlots) || (previous?.start === 1 && previous.slots === maxSlots);
-
-        if (!previous || forceRebuild) {
-            if (ordinalLock) {
-                return 1;
-            }
-            return this.clampNumericRangeStart(newMin, newMax, maxSlots, newMin);
-        }
-
-        if (ordinalLock) {
-            return 1;
-        }
-
-        let desiredStart = previous.start;
-        const previousEnd = previous.start + previous.slots - 1;
-
-        if (previous.slots !== maxSlots) {
-            desiredStart = previous.start;
-        }
-
-        if (newMin < previous.start) {
-            desiredStart = newMin;
-        } else if (newMax > previousEnd) {
-            desiredStart = newMax - maxSlots + 1;
-        }
-
-        return this.clampNumericRangeStart(newMin, newMax, maxSlots, desiredStart);
-    }
-
-    private clampNumericRangeStart(newMin: number, newMax: number, maxSlots: number, desiredStart: number): number {
-        if (maxSlots <= 0) {
-            return newMin;
-        }
-        const minPossible = newMin;
-        let maxPossible = newMax - maxSlots + 1;
-        if (maxPossible < minPossible) {
-            maxPossible = minPossible;
-        }
-
-        if (desiredStart < minPossible) {
-            return minPossible;
-        }
-        if (desiredStart > maxPossible) {
-            return maxPossible;
-        }
-        return desiredStart;
-    }
-
-    private shouldPreferOrdinalBase(values: number[], maxSlots: number): boolean {
-        if (maxSlots <= 0 || values.length === 0) {
-            return false;
-        }
-        const allIntegers = values.every(value => Number.isFinite(value) && Number.isInteger(value));
-        if (!allIntegers) {
-            return false;
-        }
-        const minValue = values[0];
-        const maxValue = values[values.length - 1];
-        return minValue >= 1 && maxValue <= maxSlots;
-    }
-
-    private initializeNumericPlaceholderRange(start: number, slots: number, palette: string[]): void {
-        this.numericPlaceholderRange = { start, slots };
-        this.categoricalColorMap.clear();
-        this.categoricalStableOrder = [];
-        for (let i = 0; i < slots; i++) {
-            const value = start + i;
-            this.categoricalStableOrder.push(value);
-            this.categoricalColorMap.set(value, palette[i] || "#000000");
-        }
-    }
-
-    private applyPaletteToNumericRange(palette: string[]): void {
-        if (!this.numericPlaceholderRange) {
-            return;
-        }
-        const { start, slots } = this.numericPlaceholderRange;
-        this.categoricalColorMap.clear();
-        this.categoricalStableOrder = [];
-        for (let i = 0; i < slots; i++) {
-            const value = start + i;
-            this.categoricalStableOrder.push(value);
-            this.categoricalColorMap.set(value, palette[i] || "#000000");
-        }
-    }
-
-    private applyTextUniquePalette(
-        sortedValues: any[],
-        palette: string[],
-        maxSlots: number,
-        forceReset: boolean
-    ): void {
-        if (forceReset) {
-            this.categoricalColorMap.clear();
-            this.categoricalStableOrder = [];
-        }
-
-        this.numericPlaceholderRange = undefined;
-
-        for (const value of sortedValues) {
-            if (!this.categoricalStableOrder.includes(value) && this.categoricalStableOrder.length < maxSlots) {
-                this.categoricalStableOrder.push(value);
-            }
-        }
-
-        if (this.categoricalStableOrder.length > maxSlots) {
-            this.categoricalStableOrder = this.categoricalStableOrder.slice(0, maxSlots);
-        }
-
-        this.categoricalStableOrder.forEach((value, index) => {
-            this.categoricalColorMap.set(value, palette[index] || "#000000");
-        });
     }
 }
