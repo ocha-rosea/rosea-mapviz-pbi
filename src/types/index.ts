@@ -275,3 +275,6 @@ export interface MapToolsOptions {
     legendRightMargin: number;
 
 }
+
+// Re-export type guards for runtime validation
+export * from "./guards";
