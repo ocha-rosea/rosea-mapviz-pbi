@@ -21,11 +21,31 @@ import { MessageService } from "../services/MessageService";
 import { CircleLayerOptionsBuilder } from "../services/LayerOptionBuilders";
 import { BaseOrchestrator } from "./BaseOrchestrator";
 
+/**
+ * Orchestrator for scaled circle (proportional symbol) visualizations.
+ * 
+ * Manages the rendering of circle markers on the map where circle size represents
+ * data values. Supports multiple rendering engines (SVG, Canvas, WebGL) and
+ * chart types (simple circles, pie charts, donut charts).
+ * 
+ * @extends BaseOrchestrator
+ * @example
+ * ```typescript
+ * const orchestrator = new CircleOrchestrator({ svg, map, host, ... });
+ * const layer = orchestrator.render(categorical, circleOptions, dataService, mapToolsOptions, false);
+ * ```
+ */
 export class CircleOrchestrator extends BaseOrchestrator {
+    /** Builder for constructing circle layer options */
     private circleOptsBuilder: CircleLayerOptionsBuilder;
-
+    /** Current circle layer instance (SVG, Canvas, or WebGL) */
     private circleLayer: CircleLayer | CircleCanvasLayer | CircleWebGLLayer | undefined;
 
+    /**
+     * Creates a new CircleOrchestrator.
+     * 
+     * @param args - Configuration options inherited from BaseOrchestrator
+     */
     constructor(args: {
         svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
         svgOverlay: SVGSVGElement;
@@ -46,14 +66,37 @@ export class CircleOrchestrator extends BaseOrchestrator {
         });
     }
 
+    /**
+     * Returns the current circle layer instance.
+     * 
+     * @returns The active circle layer or undefined if not rendered
+     */
     public getLayer(): CircleLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
         return this.circleLayer;
     }
 
-    public setSelectedIds(selectionIds: ISelectionId[]) {
+    /**
+     * Updates the selected data points on the circle layer.
+     * 
+     * @param selectionIds - Array of Power BI selection IDs to highlight
+     */
+    public setSelectedIds(selectionIds: ISelectionId[]): void {
         if (this.circleLayer && (this.circleLayer as any).setSelectedIds) (this.circleLayer as any).setSelectedIds(selectionIds);
     }
 
+    /**
+     * Renders the circle visualization based on categorical data.
+     * 
+     * Parses the input data, calculates circle scales, creates the appropriate
+     * layer type based on render engine settings, and renders the legend.
+     * 
+     * @param categorical - Power BI categorical data containing coordinates and measures
+     * @param circleOptions - Configuration options for circle appearance and behavior
+     * @param dataService - Service for data processing and tooltip extraction
+     * @param mapToolsOptions - Map interaction options (extent locking, render engine)
+     * @param choroplethDisplayed - Whether a choropleth layer is also displayed (affects extent fitting)
+     * @returns The rendered circle layer or undefined if rendering failed
+     */
     public render(
         categorical: any,
         circleOptions: CircleOptions,
@@ -142,6 +185,14 @@ export class CircleOrchestrator extends BaseOrchestrator {
 
     // parsing moved to src/data/circle.ts
 
+    /**
+     * Combines circle size values from multiple measures into a single array.
+     * For pie/donut charts, also includes the sum of paired values.
+     * 
+     * @param circleSizeValuesObjects - Array of measure value objects
+     * @param circleOptions - Circle configuration options
+     * @returns Combined array of all size values
+     */
     private combineCircleSizeValues(circleSizeValuesObjects: any[], circleOptions: CircleOptions): number[] {
         const individual = [
             ...(circleSizeValuesObjects[0]?.values || []),
@@ -166,6 +217,16 @@ export class CircleOrchestrator extends BaseOrchestrator {
 
     // applyScaling moved to src/math/circles.ts
 
+    /**
+     * Creates data point objects for each circle with coordinates, tooltips, and selection IDs.
+     * 
+     * @param longitudes - Array of longitude values
+     * @param latitudes - Array of latitude values
+     * @param circleSizeValuesObjects - Measure value objects for tooltip/selection binding
+     * @param categorical - Power BI categorical data for selection ID creation
+     * @param dataService - Service for extracting tooltip information
+     * @returns Array of circle data point objects
+     */
     private createCircleDataPoints(
         longitudes: number[],
         latitudes: number[],
@@ -192,6 +253,14 @@ export class CircleOrchestrator extends BaseOrchestrator {
 
     // Options construction moved to LayerOptionBuilders
 
+    /**
+     * Renders the circle layer on the map with the appropriate rendering engine.
+     * Automatically falls back to Canvas for pie/donut charts when WebGL is selected.
+     * 
+     * @param circleLayerOptions - Configuration options for the circle layer
+     * @param mapToolsOptions - Map tools configuration including render engine
+     * @param choroplethDisplayed - Whether choropleth layer is also displayed (affects auto-fit behavior)
+     */
     private renderCircleLayerOnMap(circleLayerOptions: CircleLayerOptions, mapToolsOptions: MapToolsOptions, choroplethDisplayed: boolean): void {
         if (this.circleLayer) {
             try { (this.circleLayer as any).dispose?.(); } catch {}
@@ -217,6 +286,20 @@ export class CircleOrchestrator extends BaseOrchestrator {
         }
     }
 
+    /**
+     * Renders the proportional circle legend showing size-to-value mapping.
+     * Calculates appropriate legend values and radii based on the data distribution.
+     * Handles adaptive scaling when data values exceed the configured maximum.
+     * 
+     * @param combinedCircleSizeValues - All combined measure values
+     * @param numberofCircleCategories - Number of circle categories (1 or 2)
+     * @param minCircleSizeValue - Minimum value for scaling
+     * @param maxCircleSizeValue - Maximum value for scaling
+     * @param circleScale - Computed scale factor
+     * @param selectedScalingMethod - The scaling method name (e.g., 'flannery', 'linear')
+     * @param circleOptions - Circle configuration options
+     * @param circleMeasureLegendEntries - Optional legend entries for multi-measure display
+     */
     private renderCircleLegend(
         combinedCircleSizeValues: number[],
         numberofCircleCategories: number,
@@ -278,6 +361,14 @@ export class CircleOrchestrator extends BaseOrchestrator {
         this.legendService.showLegend("circle");
     }
 
+    /**
+     * Builds legend entries for circle measures showing color and name.
+     * Used for pie/donut charts to display what each color represents.
+     * 
+     * @param circleSizeValuesObjects - Array of measure value objects (expects exactly 2 for pie/donut)
+     * @param circleOptions - Circle configuration options including colors
+     * @returns Array of legend entries with name, color, and opacity
+     */
     private buildCircleMeasureLegendEntries(
         circleSizeValuesObjects: any[],
         circleOptions: CircleOptions

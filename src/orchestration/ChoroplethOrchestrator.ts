@@ -45,6 +45,20 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
     private uniqueClassification: UniqueClassificationService;
 
+    /**
+     * Creates a new ChoroplethOrchestrator instance.
+     * 
+     * @param args - Configuration object containing required dependencies
+     * @param args.svg - D3 selection for the main SVG container
+     * @param args.svgOverlay - SVG overlay element for additional graphics
+     * @param args.svgContainer - HTML container for the SVG elements
+     * @param args.legendService - Service for managing choropleth legends
+     * @param args.host - Power BI visual host for API access
+     * @param args.map - OpenLayers map instance
+     * @param args.selectionManager - Power BI selection manager for cross-filtering
+     * @param args.tooltipServiceWrapper - Tooltip service wrapper for hover info
+     * @param args.cacheService - Cache service for boundary data caching
+     */
     constructor(args: {
         svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
         svgOverlay: SVGSVGElement;
@@ -68,14 +82,42 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         });
     }
 
+    /**
+     * Returns the current choropleth layer instance if one exists.
+     * 
+     * @returns The active choropleth layer (Canvas, WebGL, or SVG), or undefined if not rendered
+     */
     public getLayer(): ChoroplethLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined {
         return this.choroplethLayer as any;
     }
 
+    /**
+     * Updates the selection state on the choropleth layer.
+     * Used for cross-filtering and highlighting selected regions.
+     * 
+     * @param selectionIds - Array of Power BI selection IDs to highlight
+     */
     public setSelectedIds(selectionIds: ISelectionId[]) {
         if (this.choroplethLayer && (this.choroplethLayer as any).setSelectedIds) (this.choroplethLayer as any).setSelectedIds(selectionIds);
     }
 
+    /**
+     * Main render method for choropleth visualization.
+     * 
+     * Orchestrates the full rendering pipeline:
+     * 1. Validates input data and options
+     * 2. Parses categorical data to extract P-Codes and color values
+     * 3. Prepares data with classification and color scales
+     * 4. Fetches boundary data (GeoBoundaries or custom URL)
+     * 5. Renders the choropleth layer on the map
+     * 6. Creates or hides the legend based on options
+     * 
+     * @param categorical - Power BI categorical data containing boundary IDs and measures
+     * @param choroplethOptions - Configuration options for choropleth display
+     * @param dataService - Service for data processing and classification
+     * @param mapToolsOptions - Map tools configuration including render engine
+     * @returns Promise resolving to the rendered layer, or undefined if rendering failed
+     */
     public async render(
         categorical: any,
         choroplethOptions: ChoroplethOptions,
@@ -149,6 +191,18 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
 
     // parsing moved to src/data/choropleth.ts
 
+    /**
+     * Prepares choropleth data including color values, class breaks, and color scales.
+     * Handles unique classification with stable color mapping and single-value numeric collapse.
+     * 
+     * @param categorical - Power BI categorical data
+     * @param choroplethOptions - Choropleth configuration options
+     * @param AdminPCodeNameIDCategory - Category containing boundary IDs
+     * @param colorMeasure - Measure containing values for coloring
+     * @param pCodes - Array of P-Code values from the data
+     * @param dataService - Service for classification and color scale generation
+     * @returns Dataset containing color values, class breaks, color scale, and data points
+     */
     private prepareChoroplethData(
         categorical: any,
         choroplethOptions: ChoroplethOptions,
@@ -209,6 +263,27 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         return { colorValues, classBreaks, colorScale, pcodeKey, dataPoints } as any;
     }
 
+    /**
+     * Fetches boundary data and renders the choropleth layer on the map.
+     * 
+     * Handles two data sources:
+     * - **GeoBoundaries**: Resolves URL via catalog or API, supports world dataset for ADM0
+     * - **Custom URL**: Uses user-provided TopoJSON/GeoJSON URL with validation
+     * 
+     * Includes caching, abort controller for cancellation, and error handling.
+     * 
+     * @param choroplethOptions - Choropleth configuration options
+     * @param AdminPCodeNameIDCategory - Category containing boundary IDs
+     * @param colorMeasure - Measure containing values for coloring
+     * @param colorValues - Array of numeric values for coloring
+     * @param classBreaks - Classification breaks for color mapping
+     * @param colorScale - Color scale function or array
+     * @param pcodeKey - Property name for matching features to data
+     * @param dataPoints - Array of data points with P-Code, value, tooltip, and selection ID
+     * @param validPCodes - Array of valid P-Code values to filter boundaries
+     * @param dataService - Service for geo data processing
+     * @param mapToolsOptions - Map tools configuration including render engine
+     */
     private async fetchAndRenderChoroplethLayer(
         choroplethOptions: ChoroplethOptions,
         AdminPCodeNameIDCategory: any,
@@ -396,6 +471,13 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         } catch (error) { this.messages.choroplethFetchError(); }
     }
 
+    /**
+     * Renders the choropleth layer on the map with the appropriate rendering engine.
+     * Disposes of any existing layer before creating a new one.
+     * 
+     * @param layerOptions - Configuration options for the choropleth layer
+     * @param mapToolsOptions - Map tools configuration including render engine ('webgl', 'canvas', or 'svg')
+     */
     private renderChoroplethLayerOnMap(
         layerOptions: ChoroplethLayerOptions,
         mapToolsOptions: MapToolsOptions

@@ -3,19 +3,54 @@ import { VisualConfig } from "../config/VisualConfig";
 import { MapService } from "../services/MapService";
 import { MapToolsOptions } from "../types/index";
 
+/**
+ * Orchestrator for map interaction tools and extent locking.
+ * 
+ * Manages map controls visibility (zoom buttons) and handles extent locking
+ * functionality that allows users to persist their map view across data refreshes.
+ * 
+ * @example
+ * ```typescript
+ * const orchestrator = new MapToolsOrchestrator(map, mapService);
+ * orchestrator.attach(options, (extent, zoom) => {
+ *   // Persist extent and zoom to Power BI properties
+ * });
+ * ```
+ */
 export class MapToolsOrchestrator {
+  /** OpenLayers map instance */
   private map: Map;
+  /** Map service for managing map controls */
   private mapService: MapService;
+  /** Current map tools configuration */
   private mapToolsOptions: MapToolsOptions;
+  /** Handler for map postrender events (extent persistence) */
   private postRenderHandler?: (e: any) => void;
+  /** Debounce timer for extent persistence */
   private postRenderDebounce?: number;
 
+  /**
+   * Creates a new MapToolsOrchestrator.
+   * 
+   * @param map - OpenLayers map instance
+   * @param mapService - Service for managing map controls and interactions
+   */
   constructor(map: Map, mapService: MapService) {
     this.map = map;
     this.mapService = mapService;
   }
 
-  public attach(options: MapToolsOptions, persist: (extent: string, zoom: number) => void) {
+  /**
+   * Attaches map tools functionality based on the provided options.
+   * 
+   * Configures zoom control visibility and sets up extent locking if enabled.
+   * When extent is locked, the map view will be restored to the saved position
+   * and any changes will be persisted via the callback.
+   * 
+   * @param options - Map tools configuration options
+   * @param persist - Callback function to persist extent and zoom changes
+   */
+  public attach(options: MapToolsOptions, persist: (extent: string, zoom: number) => void): void {
     this.mapToolsOptions = options;
 
     // Toggle zoom control
@@ -74,7 +109,12 @@ export class MapToolsOrchestrator {
     }
   }
 
-  public detach() {
+  /**
+   * Detaches map tools functionality and cleans up event handlers.
+   * 
+   * Should be called when extent locking is disabled or when the visual is destroyed.
+   */
+  public detach(): void {
     if (this.postRenderHandler) {
       this.map.un("postrender", this.postRenderHandler);
       this.postRenderHandler = undefined;

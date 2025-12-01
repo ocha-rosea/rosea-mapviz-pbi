@@ -11,27 +11,72 @@ import { MessageService } from "../services/MessageService";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
+/**
+ * Configuration options for initializing an orchestrator.
+ */
+export interface OrchestratorConfig {
+    /** D3 selection for the SVG element used for rendering */
+    svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
+    /** SVG overlay element for additional rendering */
+    svgOverlay: SVGSVGElement;
+    /** Container element for the SVG */
+    svgContainer: HTMLElement;
+    /** Service for managing legend display */
+    legendService: LegendService;
+    /** Power BI visual host for accessing platform features */
+    host: IVisualHost;
+    /** OpenLayers map instance */
+    map: Map;
+    /** Power BI selection manager for handling data point selections */
+    selectionManager: ISelectionManager;
+    /** Tooltip service wrapper for displaying tooltips */
+    tooltipServiceWrapper: ITooltipServiceWrapper;
+}
+
+/**
+ * Abstract base class for visualization orchestrators.
+ * 
+ * Provides common functionality for managing layers, legends, and map interactions.
+ * Concrete implementations handle specific visualization types (choropleth, circles, etc.).
+ * 
+ * @abstract
+ * @example
+ * ```typescript
+ * class MyOrchestrator extends BaseOrchestrator {
+ *   public render(data: any, options: any) {
+ *     this.clearGroup('#myGroup');
+ *     // Render logic...
+ *     this.fitExtentIfUnlocked(extent, options.lockMapExtent);
+ *   }
+ * }
+ * ```
+ */
 export abstract class BaseOrchestrator {
+    /** D3 selection for the main SVG element */
     protected svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
+    /** SVG overlay element for additional rendering layers */
     protected svgOverlay: SVGSVGElement;
+    /** Container element holding the SVG */
     protected svgContainer: HTMLElement;
+    /** Service for creating and managing legends */
     protected legendService: LegendService;
+    /** Power BI visual host for platform integration */
     protected host: IVisualHost;
+    /** OpenLayers map instance for geographic rendering */
     protected map: Map;
+    /** Power BI selection manager for data point selection */
     protected selectionManager: ISelectionManager;
+    /** Tooltip service for displaying hover information */
     protected tooltipServiceWrapper: ITooltipServiceWrapper;
+    /** Message service for displaying warnings and errors to users */
     protected messages: MessageService;
 
-    constructor(args: {
-        svg: d3.Selection<SVGElement, unknown, HTMLElement, any>;
-        svgOverlay: SVGSVGElement;
-        svgContainer: HTMLElement;
-        legendService: LegendService;
-        host: IVisualHost;
-        map: Map;
-        selectionManager: ISelectionManager;
-        tooltipServiceWrapper: ITooltipServiceWrapper;
-    }) {
+    /**
+     * Creates a new orchestrator instance.
+     * 
+     * @param args - Configuration options for the orchestrator
+     */
+    constructor(args: OrchestratorConfig) {
         this.svg = args.svg;
         this.svgOverlay = args.svgOverlay;
         this.svgContainer = args.svgContainer;
@@ -43,18 +88,35 @@ export abstract class BaseOrchestrator {
         this.messages = new MessageService(this.host);
     }
 
-    protected clearGroup(groupId: string) {
+    /**
+     * Clears all child elements from an SVG group.
+     * 
+     * @param groupId - CSS selector for the group to clear (e.g., '#myGroup')
+     */
+    protected clearGroup(groupId: string): void {
         const group = this.svg.select(groupId);
         group.selectAll("*").remove();
     }
 
-    protected removeLayerIfPresent(layer: { dispose?: () => void } | undefined, remover: (layer: any) => void) {
+    /**
+     * Safely removes a layer from the map if it exists.
+     * 
+     * @param layer - The layer to remove (may be undefined)
+     * @param remover - Function to call for removing the layer (typically map.removeLayer)
+     */
+    protected removeLayerIfPresent(layer: { dispose?: () => void } | undefined, remover: (layer: any) => void): void {
         if (layer) {
             try { remover(layer); } catch {}
         }
     }
 
-    protected fitExtentIfUnlocked(extent: number[] | undefined, lockMapExtent: boolean | undefined) {
+    /**
+     * Fits the map view to the given extent unless map extent is locked.
+     * 
+     * @param extent - Bounding box extent [minX, minY, maxX, maxY]
+     * @param lockMapExtent - If true, the map extent will not be changed
+     */
+    protected fitExtentIfUnlocked(extent: number[] | undefined, lockMapExtent: boolean | undefined): void {
         if (!lockMapExtent && extent) {
             this.map.getView().fit(extent, VisualConfig.MAP.FIT_OPTIONS);
         }
