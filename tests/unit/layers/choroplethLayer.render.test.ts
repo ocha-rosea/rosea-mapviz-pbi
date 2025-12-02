@@ -70,14 +70,10 @@ function frameState(resolution = 4000): any {
 }
 
 describe('ChoroplethSvgLayer render basics', () => {
-  it('constructs value lookup and spatial index', () => {
+  it('constructs value lookup from category and measure values', () => {
     const opts = makeOptions();
     const layer = new ChoroplethSvgLayer(opts);
     expect(layer.valueLookup).toEqual({ A: 1, B: 2 });
-    // spatial index should exist with two items loaded
-    const index = (layer as any).spatialIndex;
-    expect(index).toBeTruthy();
-    expect(index.data.children.length).toBeGreaterThan(0); // rbush internal structure
   });
 
   it('render creates choropleth group with path elements', () => {

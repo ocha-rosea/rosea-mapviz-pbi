@@ -6,7 +6,6 @@ import { geoBounds, geoPath, geoMercator } from 'd3-geo';
 import { Extent } from 'ol/extent.js';
 import { FrameState } from 'ol/Map';
 import { DomIds } from "../../constants/strings";
-import rbush from 'rbush';
 // TopoJSON imports removed - simplification now handled by GeometrySimplificationService in orchestrator
 import ISelectionId = powerbi.visuals.ISelectionId;
 import { createWebMercatorProjection } from "../../utils/map";
@@ -49,7 +48,6 @@ export class ChoroplethSvgLayer extends Layer {
     private geojson: any;
     public options: ChoroplethLayerOptions;
     public valueLookup: { [key: string]: number | null | undefined };
-    private spatialIndex: any;
     private d3Path: any;
     private selectedIds: powerbi.extensibility.ISelectionId[] = [];
     private isActive: boolean = true;
@@ -71,20 +69,6 @@ export class ChoroplethSvgLayer extends Layer {
         pCodes.forEach((pCode, index) => {
             this.valueLookup[pCode] = colorValues[index];
         });
-
-        // Build the spatial index
-        this.spatialIndex = new rbush();
-        const features = this.geojson.features.map((feature: GeoJSONFeature) => {
-            const bounds = geoBounds(feature);
-            return {
-                minX: bounds[0][0],
-                minY: bounds[0][1],
-                maxX: bounds[1][0],
-                maxY: bounds[1][1],
-                feature: feature
-            };
-        });
-        this.spatialIndex.load(features);
 
         this.d3Path = null;
         // Geometry is pre-simplified by orchestrator via GeometrySimplificationService
@@ -351,10 +335,6 @@ export class ChoroplethSvgLayer extends Layer {
     // TODO (Phase 4): Revisit zoom-level simplification for all engines
     private getSimplifiedGeoJsonForResolution(_resolution: number) {
         return this.geojson;
-    }
-
-    getSpatialIndex() {
-        return this.spatialIndex;
     }
 
     getd3Path() {

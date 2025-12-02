@@ -3,7 +3,6 @@ import { FrameState } from 'ol/Map';
 import { State } from 'ol/source/Source';
 import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../../types';
 import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
-import rbush from 'rbush';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
 import { selectionOpacity } from '../../utils/graphics';
@@ -39,7 +38,6 @@ export class ChoroplethCanvasLayer extends Layer {
   private selectedIds: powerbi.extensibility.ISelectionId[] = [];
   private isActive = true;
   private valueLookup: { [key: string]: number | null | undefined } = {};
-  private index: any;
   private geojson: any;
 
   constructor(options: ChoroplethLayerOptions) {
@@ -49,13 +47,6 @@ export class ChoroplethCanvasLayer extends Layer {
     const pCodes = options.categoryValues as string[];
   const vals = options.measureValues as Array<number | null | undefined>;
     pCodes.forEach((p, i) => { this.valueLookup[p] = vals[i]; });
-
-    this.index = new rbush();
-    const items = this.geojson.features.map((f: GeoJSONFeature) => {
-      const b = bounds(f);
-      return { minX: b[0][0], minY: b[0][1], maxX: b[1][0], maxY: b[1][1], feature: f };
-    });
-    this.index.load(items);
 
     this.changed();
   }
@@ -163,14 +154,6 @@ export class ChoroplethCanvasLayer extends Layer {
     const extent4326: Extent = [minX, minY, maxX, maxY] as any;
     return transformExtent(extent4326, 'EPSG:4326', 'EPSG:3857');
   }
-}
-
-function bounds(f: GeoJSONFeature) {
-  // very basic lon/lat box - now supports GeometryCollections
-  const coords = coordIter(f);
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const [x, y] of coords) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
-  return [[minX, minY], [maxX, maxY]] as [[number, number], [number, number]];
 }
 
 /**
