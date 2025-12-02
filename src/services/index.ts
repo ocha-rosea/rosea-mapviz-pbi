@@ -31,3 +31,4 @@ export { StateManager } from "./StateManager";
 export type { StateManagerConfig } from "./StateManager";
 export { UniqueClassificationService } from "./UniqueClassificationService";
 export type { UniqueClassificationResult, UniqueClassificationConfig } from "./UniqueClassificationService";
+export { LocalizationService } from "./LocalizationService";

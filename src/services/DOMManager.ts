@@ -10,6 +10,7 @@
 import * as d3 from "d3";
 import { DomIds, LegendPositions } from "../constants/strings";
 import { ROSEA_LOGO_PATHS, ROSEA_LOGO_VIEWBOX, ROSEA_LOGO_FILL } from "../assets/roseaLogo";
+import type { LocalizationService } from "./LocalizationService";
 
 /**
  * Configuration for creating the visual's DOM structure.
@@ -60,10 +61,18 @@ export class DOMManager {
     private svgContainer: HTMLElement;
     private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
     private landingPage: HTMLElement | null = null;
+    private localizationService: LocalizationService | null = null;
 
     constructor(config: DOMConfig) {
         this.container = config.container;
         this.initializeDOMElements();
+    }
+
+    /**
+     * Sets the localization service for localized content.
+     */
+    public setLocalizationService(service: LocalizationService): void {
+        this.localizationService = service;
     }
 
     /**
@@ -333,6 +342,24 @@ export class DOMManager {
         this.landingPage = document.createElement('div');
         this.landingPage.className = 'rosea-landing-page';
 
+        // Get localized strings (with fallbacks)
+        const ls = this.localizationService;
+        const strings = {
+            title: ls?.getLandingTitle() || 'ROSEA MapViz',
+            description: ls?.getLandingDescription() || 'Custom Power BI Visual for Humanitarian Maps',
+            gettingStarted: ls?.getLandingGettingStarted() || 'Getting Started',
+            choroplethMap: ls?.getLandingChoroplethMap() || 'Choropleth Map:',
+            choroplethInstruction: ls?.getLandingChoroplethInstructions() || 'Add Boundary ID and Choropleth Color fields',
+            scaledCircles: ls?.getLandingScaledCircles() || 'Scaled Circles:',
+            circlesInstruction: ls?.getLandingScaledCirclesInstructions() || 'Add Longitude, Latitude, and Circle Size fields',
+            tip: ls?.getLandingTip() || '💡 Tip: Configure basemap and styling in the Format pane',
+            boundaryId: ls?.get("Role_BoundaryID") || 'Boundary ID',
+            choroplethColor: ls?.get("Role_ChoroplethColor") || 'Choropleth Color',
+            longitude: ls?.get("Role_Longitude") || 'Longitude',
+            latitude: ls?.get("Role_Latitude") || 'Latitude',
+            circleSize: ls?.get("Role_CircleSize") || 'Circle Size'
+        };
+
         // Build landing page content using DOM methods (avoid innerHTML for security)
         const content = document.createElement('div');
         content.className = 'landing-content';
@@ -356,28 +383,28 @@ export class DOMManager {
         icon.appendChild(iconSvg);
 
         const title = document.createElement('h2');
-        title.textContent = 'ROSEA MapViz';
+        title.textContent = strings.title;
 
         const description = document.createElement('p');
-        description.textContent = 'Custom Power BI Visual for Humanitarian Maps';
+        description.textContent = strings.description;
 
         const instructions = document.createElement('div');
         instructions.className = 'landing-instructions';
 
         const instructionsTitle = document.createElement('h3');
-        instructionsTitle.textContent = 'Getting Started';
+        instructionsTitle.textContent = strings.gettingStarted;
 
         const list = document.createElement('ul');
 
         const item1 = document.createElement('li');
         const item1Strong = document.createElement('strong');
-        item1Strong.textContent = 'Choropleth Map:';
+        item1Strong.textContent = strings.choroplethMap;
         const item1Text = document.createTextNode(' Add ');
         const item1Em1 = document.createElement('em');
-        item1Em1.textContent = 'Boundary ID';
+        item1Em1.textContent = strings.boundaryId;
         const item1Text2 = document.createTextNode(' and ');
         const item1Em2 = document.createElement('em');
-        item1Em2.textContent = 'Choropleth Color';
+        item1Em2.textContent = strings.choroplethColor;
         const item1Text3 = document.createTextNode(' fields');
         item1.appendChild(item1Strong);
         item1.appendChild(item1Text);
@@ -388,16 +415,16 @@ export class DOMManager {
 
         const item2 = document.createElement('li');
         const item2Strong = document.createElement('strong');
-        item2Strong.textContent = 'Scaled Circles:';
+        item2Strong.textContent = strings.scaledCircles;
         const item2Text = document.createTextNode(' Add ');
         const item2Em1 = document.createElement('em');
-        item2Em1.textContent = 'Longitude';
+        item2Em1.textContent = strings.longitude;
         const item2Text2 = document.createTextNode(', ');
         const item2Em2 = document.createElement('em');
-        item2Em2.textContent = 'Latitude';
+        item2Em2.textContent = strings.latitude;
         const item2Text3 = document.createTextNode(', and ');
         const item2Em3 = document.createElement('em');
-        item2Em3.textContent = 'Circle Size';
+        item2Em3.textContent = strings.circleSize;
         const item2Text4 = document.createTextNode(' fields');
         item2.appendChild(item2Strong);
         item2.appendChild(item2Text);

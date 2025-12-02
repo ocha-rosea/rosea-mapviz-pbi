@@ -38,7 +38,7 @@ import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
-import { MessageService, DOMManager, StateManager } from "./services";
+import { MessageService, DOMManager, StateManager, LocalizationService } from "./services";
 
 import { RoseaMapVizFormattingSettingsModel } from "./settings"; import "ol/ol.css";
 import Map from "ol/Map";
@@ -77,6 +77,7 @@ export class RoseaMapViz implements IVisual {
     private dataService: ChoroplethDataService;
     private cacheService: CacheService;
     private messages: MessageService;
+    private localizationService: LocalizationService;
     
     // Map
     private map: Map;
@@ -106,6 +107,7 @@ export class RoseaMapViz implements IVisual {
         // Initialize state manager (handles debug settings)
         this.stateManager = new StateManager({ host: this.host });
         this.messages = new MessageService(this.host);
+        this.localizationService = new LocalizationService(this.host.createLocalizationManager());
         
         // Initialize formatting
         this.formattingSettingsService = new FormattingSettingsService();
@@ -117,6 +119,7 @@ export class RoseaMapViz implements IVisual {
         
         // Initialize DOM Manager and create DOM elements
         this.domManager = new DOMManager({ container: this.container });
+        this.domManager.setLocalizationService(this.localizationService);
         const elements = this.domManager.getElements();
         
         // Initialize legend service
