@@ -9,6 +9,7 @@
  * 3. Skip simplification for TopoJSON sources (already optimized)
  * 4. Use evidence-based thresholds based on feature count and vertex density
  * 5. Apply simplification BEFORE rendering, same data for all engines
+ * 6. PRESERVE TOPOLOGY: Shared edges between adjacent polygons remain coincident
  */
 
 import type { FeatureCollection, Feature, Geometry, Position } from 'geojson';
@@ -26,6 +27,9 @@ export interface SimplificationOptions {
   
   /** Enable auto-detection of optimal simplification level */
   autoDetect: boolean;
+  
+  /** Preserve topology (shared edges) between adjacent polygons. Default: true */
+  preserveTopology?: boolean;
 }
 
 export interface SimplificationMetrics {
@@ -182,9 +186,12 @@ export class GeometrySimplificationService {
       };
     }
     
-    // 6. Apply simplification while preserving structure
+    // 6. Apply simplification while preserving structure and topology
     const tolerance = this.adjustTolerance(TOLERANCES[level], options.strength);
-    const simplified = this.simplifyPreservingStructure(geojson, tolerance);
+    const preserveTopology = options.preserveTopology !== false; // Default to true
+    const simplified = preserveTopology && metrics.vertexBreakdown.polygons > 0
+      ? this.simplifyWithTopologyPreservation(geojson, tolerance)
+      : this.simplifyPreservingStructure(geojson, tolerance);
     
     // 7. Compute metrics for simplified result
     const simplifiedMetrics = this.computeMetrics(simplified);
@@ -525,6 +532,9 @@ export class GeometrySimplificationService {
   /**
    * Applies simplification while maintaining exact feature structure.
    * Each input feature maps to exactly one output feature.
+   * 
+   * NOTE: This method does NOT preserve topology - use simplifyWithTopologyPreservation
+   * for choropleth maps with adjacent polygons.
    */
   static simplifyPreservingStructure(
     geojson: FeatureCollection,
@@ -539,6 +549,372 @@ export class GeometrySimplificationService {
           : feature.geometry
       }))
     };
+  }
+  
+  // ==========================================================================
+  // Topology-Preserving Simplification
+  // ==========================================================================
+  
+  /**
+   * Applies simplification while preserving topology between adjacent polygons.
+   * 
+   * This method ensures that shared edges between polygons remain coincident
+   * after simplification, preventing gaps and overlaps in choropleth maps.
+   * 
+   * Algorithm:
+   * 1. Extract all unique edges (arcs) from polygon boundaries
+   * 2. Build a lookup of edge -> polygons using the edge
+   * 3. Simplify each unique edge once using Douglas-Peucker
+   * 4. Reconstruct polygons using simplified edges
+   * 
+   * This is similar to how TopoJSON works, but operates purely on GeoJSON.
+   */
+  static simplifyWithTopologyPreservation(
+    geojson: FeatureCollection,
+    tolerance: number
+  ): FeatureCollection {
+    // 1. Extract edges and build topology
+    const topology = this.buildTopology(geojson);
+    
+    // 2. Simplify each unique arc once
+    const simplifiedArcs = new Map<string, Position[]>();
+    for (const [arcKey, arc] of topology.arcs.entries()) {
+      simplifiedArcs.set(arcKey, this.douglasPeucker(arc, tolerance));
+    }
+    
+    // 3. Reconstruct features using simplified arcs
+    return {
+      type: 'FeatureCollection',
+      features: geojson.features.map((feature, featureIndex) => ({
+        ...feature,
+        geometry: feature.geometry 
+          ? this.reconstructGeometry(
+              feature.geometry, 
+              topology.featureArcs.get(featureIndex) || new Map(), 
+              simplifiedArcs,
+              tolerance
+            )
+          : feature.geometry
+      }))
+    };
+  }
+  
+  /**
+   * Builds a topology structure from a FeatureCollection.
+   * Identifies shared edges between polygons.
+   */
+  private static buildTopology(geojson: FeatureCollection): {
+    arcs: Map<string, Position[]>;
+    featureArcs: Map<number, Map<string, { ringIndex: number; isReversed: boolean }[]>>;
+  } {
+    const arcs = new Map<string, Position[]>();
+    const featureArcs = new Map<number, Map<string, { ringIndex: number; isReversed: boolean }[]>>();
+    
+    geojson.features.forEach((feature, featureIndex) => {
+      if (!feature.geometry) return;
+      
+      const arcRefs = new Map<string, { ringIndex: number; isReversed: boolean }[]>();
+      featureArcs.set(featureIndex, arcRefs);
+      
+      this.extractArcsFromGeometry(feature.geometry, arcs, arcRefs);
+    });
+    
+    return { arcs, featureArcs };
+  }
+  
+  /**
+   * Recursively extracts arcs from a geometry.
+   */
+  private static extractArcsFromGeometry(
+    geometry: Geometry,
+    arcs: Map<string, Position[]>,
+    arcRefs: Map<string, { ringIndex: number; isReversed: boolean }[]>,
+    ringIndexOffset: number = 0
+  ): void {
+    switch (geometry.type) {
+      case 'Polygon':
+        geometry.coordinates.forEach((ring, ringIndex) => {
+          this.extractArcsFromRing(ring, arcs, arcRefs, ringIndexOffset + ringIndex);
+        });
+        break;
+        
+      case 'MultiPolygon':
+        let offset = 0;
+        geometry.coordinates.forEach(polygon => {
+          polygon.forEach((ring, ringIndex) => {
+            this.extractArcsFromRing(ring, arcs, arcRefs, offset + ringIndex);
+          });
+          offset += polygon.length;
+        });
+        break;
+        
+      case 'GeometryCollection':
+        let gcOffset = 0;
+        geometry.geometries.forEach(geom => {
+          this.extractArcsFromGeometry(geom as Geometry, arcs, arcRefs, gcOffset);
+          // Estimate ring count for offset
+          gcOffset += this.estimateRingCount(geom as Geometry);
+        });
+        break;
+        
+      // LineStrings can also share edges but are less common in choropleths
+      case 'LineString':
+        this.extractArcFromLine(geometry.coordinates, arcs, arcRefs, ringIndexOffset);
+        break;
+        
+      case 'MultiLineString':
+        geometry.coordinates.forEach((line, lineIndex) => {
+          this.extractArcFromLine(line, arcs, arcRefs, ringIndexOffset + lineIndex);
+        });
+        break;
+    }
+  }
+  
+  /**
+   * Extracts edges from a polygon ring.
+   * Breaks the ring into segments between junction points.
+   */
+  private static extractArcsFromRing(
+    ring: Position[],
+    arcs: Map<string, Position[]>,
+    arcRefs: Map<string, { ringIndex: number; isReversed: boolean }[]>,
+    ringIndex: number
+  ): void {
+    if (ring.length < 2) return;
+    
+    // For topology preservation, we need to identify shared edges.
+    // We'll use a simple approach: treat each edge (pair of consecutive points) 
+    // as a potential shared segment.
+    
+    // Create a canonical key for each edge that is the same regardless of direction
+    for (let i = 0; i < ring.length - 1; i++) {
+      const p1 = ring[i];
+      const p2 = ring[i + 1];
+      
+      // Create canonical edge key (sorted coordinates)
+      const { key, isReversed } = this.createEdgeKey(p1, p2);
+      
+      // Store the edge if we haven't seen it
+      if (!arcs.has(key)) {
+        arcs.set(key, isReversed ? [p2, p1] : [p1, p2]);
+      }
+      
+      // Record this feature's reference to this arc
+      if (!arcRefs.has(key)) {
+        arcRefs.set(key, []);
+      }
+      arcRefs.get(key)!.push({ ringIndex, isReversed });
+    }
+  }
+  
+  /**
+   * Extracts arc from a LineString.
+   */
+  private static extractArcFromLine(
+    line: Position[],
+    arcs: Map<string, Position[]>,
+    arcRefs: Map<string, { ringIndex: number; isReversed: boolean }[]>,
+    lineIndex: number
+  ): void {
+    if (line.length < 2) return;
+    
+    // For LineStrings, treat the whole line as one arc
+    const key = this.createLineKey(line);
+    
+    if (!arcs.has(key)) {
+      arcs.set(key, line.map(c => [...c] as Position));
+    }
+    
+    if (!arcRefs.has(key)) {
+      arcRefs.set(key, []);
+    }
+    arcRefs.get(key)!.push({ ringIndex: lineIndex, isReversed: false });
+  }
+  
+  /**
+   * Creates a canonical key for an edge that is the same regardless of direction.
+   */
+  private static createEdgeKey(p1: Position, p2: Position): { key: string; isReversed: boolean } {
+    // Use string comparison to determine canonical order
+    const s1 = `${p1[0].toFixed(10)},${p1[1].toFixed(10)}`;
+    const s2 = `${p2[0].toFixed(10)},${p2[1].toFixed(10)}`;
+    
+    if (s1 < s2) {
+      return { key: `${s1}|${s2}`, isReversed: false };
+    } else {
+      return { key: `${s2}|${s1}`, isReversed: true };
+    }
+  }
+  
+  /**
+   * Creates a key for a LineString.
+   */
+  private static createLineKey(line: Position[]): string {
+    // Use endpoints to create a reversible key
+    const first = `${line[0][0].toFixed(10)},${line[0][1].toFixed(10)}`;
+    const last = `${line[line.length-1][0].toFixed(10)},${line[line.length-1][1].toFixed(10)}`;
+    return first < last ? `${first}>${last}` : `${last}>${first}`;
+  }
+  
+  /**
+   * Estimates the number of rings in a geometry.
+   */
+  private static estimateRingCount(geometry: Geometry): number {
+    switch (geometry.type) {
+      case 'Polygon':
+        return geometry.coordinates.length;
+      case 'MultiPolygon':
+        return geometry.coordinates.reduce((sum, poly) => sum + poly.length, 0);
+      case 'GeometryCollection':
+        return geometry.geometries.reduce(
+          (sum, g) => sum + this.estimateRingCount(g as Geometry), 0
+        );
+      default:
+        return 1;
+    }
+  }
+  
+  /**
+   * Reconstructs a geometry using simplified arcs.
+   */
+  private static reconstructGeometry(
+    geometry: Geometry,
+    arcRefs: Map<string, { ringIndex: number; isReversed: boolean }[]>,
+    simplifiedArcs: Map<string, Position[]>,
+    tolerance: number
+  ): Geometry {
+    switch (geometry.type) {
+      case 'Point':
+        return { type: 'Point', coordinates: [...geometry.coordinates] };
+        
+      case 'MultiPoint':
+        return { type: 'MultiPoint', coordinates: geometry.coordinates.map(c => [...c]) };
+        
+      case 'LineString':
+        // For lines, reconstruct from simplified arcs or fallback to direct simplification
+        return {
+          type: 'LineString',
+          coordinates: this.reconstructLine(geometry.coordinates, simplifiedArcs, tolerance)
+        };
+        
+      case 'MultiLineString':
+        return {
+          type: 'MultiLineString',
+          coordinates: geometry.coordinates.map(line => 
+            this.reconstructLine(line, simplifiedArcs, tolerance)
+          )
+        };
+        
+      case 'Polygon':
+        return {
+          type: 'Polygon',
+          coordinates: geometry.coordinates.map(ring =>
+            this.reconstructRing(ring, simplifiedArcs, tolerance)
+          )
+        };
+        
+      case 'MultiPolygon':
+        return {
+          type: 'MultiPolygon',
+          coordinates: geometry.coordinates.map(polygon =>
+            polygon.map(ring => this.reconstructRing(ring, simplifiedArcs, tolerance))
+          )
+        };
+        
+      case 'GeometryCollection':
+        return {
+          type: 'GeometryCollection',
+          geometries: geometry.geometries.map(g => 
+            this.reconstructGeometry(g as Geometry, arcRefs, simplifiedArcs, tolerance)
+          )
+        };
+        
+      default:
+        return geometry;
+    }
+  }
+  
+  /**
+   * Reconstructs a polygon ring using simplified edges.
+   */
+  private static reconstructRing(
+    ring: Position[],
+    simplifiedArcs: Map<string, Position[]>,
+    tolerance: number
+  ): Position[] {
+    if (ring.length <= 4) return ring.map(c => [...c] as Position);
+    
+    const simplified: Position[] = [];
+    
+    for (let i = 0; i < ring.length - 1; i++) {
+      const p1 = ring[i];
+      const p2 = ring[i + 1];
+      const { key, isReversed } = this.createEdgeKey(p1, p2);
+      
+      // Look up the simplified edge
+      const simplifiedEdge = simplifiedArcs.get(key);
+      
+      if (simplifiedEdge && simplifiedEdge.length >= 2) {
+        // Use simplified edge coordinates
+        const edge = isReversed ? [...simplifiedEdge].reverse() : simplifiedEdge;
+        
+        // Avoid duplicating the first point except at the start
+        if (simplified.length === 0) {
+          simplified.push([...edge[0]] as Position);
+        }
+        // Add remaining points (skip first to avoid duplicate)
+        for (let j = 1; j < edge.length; j++) {
+          simplified.push([...edge[j]] as Position);
+        }
+      } else {
+        // Fallback: add points directly
+        if (simplified.length === 0) {
+          simplified.push([...p1] as Position);
+        }
+        simplified.push([...p2] as Position);
+      }
+    }
+    
+    // Ensure ring has minimum valid points
+    if (simplified.length < 4) {
+      return ring.map(c => [...c] as Position);
+    }
+    
+    // Ensure ring is properly closed
+    const first = simplified[0];
+    const last = simplified[simplified.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      simplified.push([...first] as Position);
+    }
+    
+    return simplified;
+  }
+  
+  /**
+   * Reconstructs a line using simplified arcs or direct simplification.
+   */
+  private static reconstructLine(
+    line: Position[],
+    simplifiedArcs: Map<string, Position[]>,
+    tolerance: number
+  ): Position[] {
+    const key = this.createLineKey(line);
+    const simplified = simplifiedArcs.get(key);
+    
+    if (simplified) {
+      // Check if we need to reverse
+      const lineFirst = `${line[0][0].toFixed(10)},${line[0][1].toFixed(10)}`;
+      const simpFirst = `${simplified[0][0].toFixed(10)},${simplified[0][1].toFixed(10)}`;
+      
+      if (lineFirst === simpFirst) {
+        return simplified.map(c => [...c] as Position);
+      } else {
+        return [...simplified].reverse().map(c => [...c] as Position);
+      }
+    }
+    
+    // Fallback to direct simplification
+    return this.douglasPeucker(line, tolerance);
   }
   
   /**

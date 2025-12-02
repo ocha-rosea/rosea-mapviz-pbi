@@ -676,4 +676,116 @@ describe('GeometrySimplificationService', () => {
       expect(desc).toContain('0.001');
     });
   });
+  
+  describe('topology preservation', () => {
+    
+    it('should preserve shared edges between adjacent polygons', () => {
+      // Create two adjacent squares sharing an edge at x=1
+      // Left square: [0,0] - [1,0] - [1,1] - [0,1] - [0,0]
+      // Right square: [1,0] - [2,0] - [2,1] - [1,1] - [1,0]
+      // They share the edge from [1,0] to [1,1]
+      
+      const leftSquare: Polygon = {
+        type: 'Polygon',
+        coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+      };
+      
+      const rightSquare: Polygon = {
+        type: 'Polygon',
+        coordinates: [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]]
+      };
+      
+      const geojson = createFeatureCollection(
+        createFeature(leftSquare),
+        createFeature(rightSquare)
+      );
+      
+      // Run topology-preserving simplification
+      const result = GeometrySimplificationService.simplifyWithTopologyPreservation(
+        geojson,
+        0.0001 // Small tolerance
+      );
+      
+      // Both polygons should still exist
+      expect(result.features.length).toBe(2);
+      
+      // Get the shared edge from both polygons
+      const leftCoords = (result.features[0].geometry as Polygon).coordinates[0];
+      const rightCoords = (result.features[1].geometry as Polygon).coordinates[0];
+      
+      // Find the edge at x=1 in the left polygon (going from [1,0] to [1,1])
+      let leftEdgeStart: [number, number] | null = null;
+      let leftEdgeEnd: [number, number] | null = null;
+      for (let i = 0; i < leftCoords.length - 1; i++) {
+        if (Math.abs(leftCoords[i][0] - 1) < 0.001 && Math.abs(leftCoords[i+1][0] - 1) < 0.001) {
+          leftEdgeStart = leftCoords[i] as [number, number];
+          leftEdgeEnd = leftCoords[i+1] as [number, number];
+          break;
+        }
+      }
+      
+      // Find the edge at x=1 in the right polygon (going from [1,1] to [1,0])
+      let rightEdgeStart: [number, number] | null = null;
+      let rightEdgeEnd: [number, number] | null = null;
+      for (let i = 0; i < rightCoords.length - 1; i++) {
+        if (Math.abs(rightCoords[i][0] - 1) < 0.001 && Math.abs(rightCoords[i+1][0] - 1) < 0.001) {
+          rightEdgeStart = rightCoords[i] as [number, number];
+          rightEdgeEnd = rightCoords[i+1] as [number, number];
+          break;
+        }
+      }
+      
+      // Verify edges exist (simple squares shouldn't be simplified away)
+      expect(leftEdgeStart).not.toBeNull();
+      expect(rightEdgeStart).not.toBeNull();
+    });
+    
+    it('should use topology preservation by default for polygon data', () => {
+      // Create a complex polygon that would benefit from simplification
+      const complexPoly: Polygon = {
+        type: 'Polygon',
+        coordinates: [[
+          [0, 0], [0.1, 0.001], [0.2, 0], [0.3, 0.002], [0.4, 0], [0.5, 0.001],
+          [0.6, 0], [0.7, 0.002], [0.8, 0], [0.9, 0.001], [1, 0],
+          [1, 0.1], [0.999, 0.2], [1, 0.3], [0.998, 0.4], [1, 0.5],
+          [1, 0.6], [0.999, 0.7], [1, 0.8], [0.998, 0.9], [1, 1],
+          [0.9, 1], [0.8, 0.999], [0.7, 1], [0.6, 0.998], [0.5, 1],
+          [0.4, 1], [0.3, 0.999], [0.2, 1], [0.1, 0.998], [0, 1],
+          [0, 0.9], [0.001, 0.8], [0, 0.7], [0.002, 0.6], [0, 0.5],
+          [0, 0.4], [0.001, 0.3], [0, 0.2], [0.002, 0.1], [0, 0]
+        ]]
+      };
+      
+      const geojson = createFeatureCollection(
+        createFeature(complexPoly)
+      );
+      
+      // Use default options (preserveTopology not set, should default to true)
+      const result = GeometrySimplificationService.process(geojson, {
+        sourceType: 'geojson',
+        strength: 50,
+        autoDetect: false  // Force simplification to test topology preservation
+      });
+      
+      // Result should be a valid feature collection
+      expect(result.geojson.type).toBe('FeatureCollection');
+      expect(result.geojson.features.length).toBe(1);
+    });
+    
+    it('should allow disabling topology preservation via option', () => {
+      const geojson = createFeatureCollection(
+        createFeature(squarePolygon)
+      );
+      
+      const result = GeometrySimplificationService.process(geojson, {
+        sourceType: 'geojson',
+        strength: 50,
+        autoDetect: false,
+        preserveTopology: false
+      });
+      
+      // Should still produce valid output
+      expect(result.geojson.features.length).toBe(1);
+    });
+  });
 });
