@@ -11,6 +11,9 @@ export const mockPowerBIHost = {
     getSelectionIds: jest.fn(() => []),
     registerOnSelectCallback: jest.fn(),
   })),
+  createLocalizationManager: jest.fn(() => ({
+    getDisplayName: jest.fn((key: string) => key),
+  })),
   tooltipService: {
     enabled: true,
     show: jest.fn(),

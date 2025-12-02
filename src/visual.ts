@@ -107,7 +107,12 @@ export class RoseaMapViz implements IVisual {
         // Initialize state manager (handles debug settings)
         this.stateManager = new StateManager({ host: this.host });
         this.messages = new MessageService(this.host);
-        this.localizationService = new LocalizationService(this.host.createLocalizationManager());
+        
+        // Initialize localization service (with fallback for test environments)
+        const localizationManager = this.host.createLocalizationManager?.() ?? {
+            getDisplayName: (key: string) => key
+        };
+        this.localizationService = new LocalizationService(localizationManager);
         
         // Initialize formatting
         this.formattingSettingsService = new FormattingSettingsService();
