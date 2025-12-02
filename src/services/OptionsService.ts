@@ -130,6 +130,7 @@ export class OptionsService {
         const choroplethLocationSettings = choroplethSettings.choroplethLocationBoundarySettingsGroup;
         const choroplethClassificationSettings = choroplethSettings.choroplethClassificationSettingsGroup;
         const choroplethLegendSettings = choroplethSettings.choroplethLegendSettingsGroup;
+        const nestedGeometrySettings = choroplethSettings.choroplethNestedGeometrySettingsGroup;
 
         return {
             layerControl: choroplethSettings.topLevelSlice.value,
@@ -155,6 +156,16 @@ export class OptionsService {
             strokeWidth: choroplethDisplaySettings.strokeWidth.value,
             layerOpacity: choroplethDisplaySettings.layerOpacity.value / 100,
             simplificationStrength: choroplethDisplaySettings.simplificationStrength.value,
+            // Nested geometry styling
+            showNestedPoints: nestedGeometrySettings.showNestedPoints.value,
+            nestedPointRadius: nestedGeometrySettings.nestedPointRadius.value,
+            nestedPointColor: nestedGeometrySettings.nestedPointColor.value.value,
+            nestedPointStrokeColor: nestedGeometrySettings.nestedPointStrokeColor.value.value,
+            nestedPointStrokeWidth: nestedGeometrySettings.nestedPointStrokeWidth.value,
+            showNestedLines: nestedGeometrySettings.showNestedLines.value,
+            nestedLineColor: nestedGeometrySettings.nestedLineColor.value.value,
+            nestedLineWidth: nestedGeometrySettings.nestedLineWidth.value,
+            // Legend settings
             showLegend: choroplethLegendSettings.showLegend.value,
             legendTitle: '', // Set dynamically from data role display name
             legendTitleAlignment: choroplethLegendSettings.legendTitleAlignment.value.value.toString(),

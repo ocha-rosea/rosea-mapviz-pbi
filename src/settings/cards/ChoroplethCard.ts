@@ -9,12 +9,13 @@ import {
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
     ChoroplethDisplaySettingsGroup,
-    ChoroplethLegendSettingsGroup
+    ChoroplethLegendSettingsGroup,
+    ChoroplethNestedGeometrySettingsGroup
 } from "../groups";
 
 /**
  * Composite card for choropleth map configuration in the formatting pane.
- * Contains boundary source, classification, display styling, and legend settings.
+ * Contains boundary source, classification, display styling, legend, and nested geometry settings.
  */
 export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCard {
     showLayerControl: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
@@ -26,6 +27,7 @@ export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCa
     public choroplethClassificationSettingsGroup = new ChoroplethClassificationSettingsGroup();
     public choroplethDisplaySettingsGroup = new ChoroplethDisplaySettingsGroup();
     public choroplethLegendSettingsGroup = new ChoroplethLegendSettingsGroup();
+    public choroplethNestedGeometrySettingsGroup = new ChoroplethNestedGeometrySettingsGroup();
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.showLayerControl;
     name: string = "choroplethVisualCardSettings";
@@ -34,6 +36,7 @@ export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCa
         this.choroplethLocationBoundarySettingsGroup,
         this.choroplethClassificationSettingsGroup,
         this.choroplethDisplaySettingsGroup,
-        this.choroplethLegendSettingsGroup
+        this.choroplethLegendSettingsGroup,
+        this.choroplethNestedGeometrySettingsGroup
     ];
 }

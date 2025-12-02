@@ -22,7 +22,8 @@ export {
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
     ChoroplethDisplaySettingsGroup,
-    ChoroplethLegendSettingsGroup
+    ChoroplethLegendSettingsGroup,
+    ChoroplethNestedGeometrySettingsGroup
 } from "./ChoroplethGroups";
 
 // Map controls settings groups

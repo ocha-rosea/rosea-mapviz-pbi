@@ -471,6 +471,78 @@ const legendTitle = this.localizationManager.getDisplayName("Legend_Title");
 
 ---
 
+## Complex Geometry Handling Analysis
+
+### Current State: GeometryCollection Support ✅ COMPLETED
+
+The visual now fully handles complex geometries including `GeometryCollection` types across all rendering layers, with user-configurable styling for nested geometries (points and lines within collections).
+
+#### Implementation Summary
+
+**1. New Types Added (`src/types/index.ts`)**
+```typescript
+export interface NestedGeometryStyle {
+    showPoints: boolean;
+    pointRadius: number;
+    pointColor: string;
+    pointStrokeColor: string;
+    pointStrokeWidth: number;
+    showLines: boolean;
+    lineColor: string;
+    lineWidth: number;
+}
+```
+
+**2. New Settings Group (`src/settings/groups/ChoroplethGroups.ts`)**
+- `ChoroplethNestedGeometrySettingsGroup` - Allows users to configure:
+  - Show/hide points and lines
+  - Point radius, color, stroke color, stroke width
+  - Line color and width
+
+**3. Layer Updates**
+
+| Layer | Status | Enhancements |
+|-------|--------|--------------|
+| **Canvas Layer** | ✅ Enhanced | Added `drawFeature()`, `collectGeometries()`, `drawPolygonGeometry()`, `drawLineGeometry()`, `drawPointGeometry()`. Geometries rendered in proper z-order: polygons → lines → points |
+| **SVG Layer** | ✅ Enhanced | Added `extractGeometries()`, `collectGeometries()`, `attachInteractions()`. Separate SVG groups for proper z-order rendering |
+| **WebGL Layer** | ✅ Enhanced | Updated `coordIter()` and `buildPath()` to handle all geometry types including GeometryCollections |
+
+**4. Rendering Order**
+All layers now render geometry types in proper z-order:
+1. **Polygons** - Base layer (choropleth fill)
+2. **Lines** - Middle layer (boundaries, paths)
+3. **Points** - Top layer (location markers)
+
+This is especially useful for IPC-style data where features contain both area polygons and point markers.
+
+**5. User Controls**
+New settings in Format Pane under "Choropleth > Nested Geometries":
+- **Show Points** - Toggle point visibility
+- **Point Radius** - 1-20 pixels
+- **Point Color** - Fill color for points
+- **Point Stroke Color** - Outline color
+- **Point Stroke Width** - 0-5 pixels
+- **Show Lines** - Toggle line visibility
+- **Line Color** - Stroke color for lines
+- **Line Width** - 1-10 pixels
+
+**Files Modified:**
+- `src/types/index.ts` - Added NestedGeometryStyle interface, updated ChoroplethOptions
+- `src/settings/groups/ChoroplethGroups.ts` - Added ChoroplethNestedGeometrySettingsGroup
+- `src/settings/groups/index.ts` - Exported new settings group
+- `src/settings/cards/ChoroplethCard.ts` - Included new settings group
+- `src/services/OptionsService.ts` - Mapped new settings
+- `src/services/LayerOptionBuilders.ts` - Added nestedGeometryStyle parameter
+- `src/orchestration/ChoroplethOrchestrator.ts` - Passed nested style to builder
+- `src/layers/choroplethLayer.ts` - Enhanced render with geometry separation
+- `src/layers/canvas/choroplethCanvasLayer.ts` - Complete rewrite of drawing functions
+- `src/layers/webgl/choroplethWebGLLayer.ts` - Enhanced coordIter and buildPath
+- `capabilities.json` - Added nested geometry properties
+
+**Tests:** All 210 tests passing ✅
+
+---
+
 ## Notes
 
 - All changes should maintain backward compatibility

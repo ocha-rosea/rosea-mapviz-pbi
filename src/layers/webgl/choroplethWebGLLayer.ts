@@ -100,32 +100,78 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
     const features: GeoJSONFeature[] = (this.options.geojson?.features || []) as any;
     const m: any = map || (this as any).getMap?.();
     const buildPath = (f: GeoJSONFeature) => {
-      const g: any = f.geometry;
       const segs: string[] = [];
       const toPx = (lon: number, lat: number) => {
         const coord3857 = fromLonLat([lon, lat]);
         const [x, y] = m.getPixelFromCoordinate(coord3857) as [number, number];
         return `${x},${y}`;
       };
-      if (g.type === 'Polygon') {
-        for (const ring of g.coordinates as any[]) {
-          for (let i = 0; i < ring.length; i++) {
-            const [lon, lat] = ring[i];
-            segs.push(i === 0 ? `M${toPx(lon, lat)}` : `L${toPx(lon, lat)}`);
-          }
-          segs.push('Z');
-        }
-      } else if (g.type === 'MultiPolygon') {
-        for (const poly of g.coordinates as any[]) {
-          for (const ring of poly) {
+      
+      // Helper to build path segments for a geometry
+      const buildGeometryPath = (g: any) => {
+        if (!g || !g.type) return;
+        
+        if (g.type === 'Polygon') {
+          for (const ring of g.coordinates as any[]) {
             for (let i = 0; i < ring.length; i++) {
               const [lon, lat] = ring[i];
               segs.push(i === 0 ? `M${toPx(lon, lat)}` : `L${toPx(lon, lat)}`);
             }
             segs.push('Z');
           }
+        } else if (g.type === 'MultiPolygon') {
+          for (const poly of g.coordinates as any[]) {
+            for (const ring of poly) {
+              for (let i = 0; i < ring.length; i++) {
+                const [lon, lat] = ring[i];
+                segs.push(i === 0 ? `M${toPx(lon, lat)}` : `L${toPx(lon, lat)}`);
+              }
+              segs.push('Z');
+            }
+          }
+        } else if (g.type === 'LineString') {
+          for (let i = 0; i < g.coordinates.length; i++) {
+            const [lon, lat] = g.coordinates[i];
+            segs.push(i === 0 ? `M${toPx(lon, lat)}` : `L${toPx(lon, lat)}`);
+          }
+        } else if (g.type === 'MultiLineString') {
+          for (const line of g.coordinates as any[]) {
+            for (let i = 0; i < line.length; i++) {
+              const [lon, lat] = line[i];
+              segs.push(i === 0 ? `M${toPx(lon, lat)}` : `L${toPx(lon, lat)}`);
+            }
+          }
+        } else if (g.type === 'Point') {
+          // Points rendered as small circles - add a small circle path
+          const [lon, lat] = g.coordinates;
+          const center = toPx(lon, lat);
+          // Create a small circular path (approximation using 4 bezier curves)
+          const r = 4; // radius in pixels
+          const [cx, cy] = center.split(',').map(Number);
+          segs.push(`M${cx-r},${cy}`);
+          segs.push(`A${r},${r} 0 1,0 ${cx+r},${cy}`);
+          segs.push(`A${r},${r} 0 1,0 ${cx-r},${cy}`);
+          segs.push('Z');
+        } else if (g.type === 'MultiPoint') {
+          for (const coord of g.coordinates as any[]) {
+            const [lon, lat] = coord;
+            const center = toPx(lon, lat);
+            const r = 4;
+            const [cx, cy] = center.split(',').map(Number);
+            segs.push(`M${cx-r},${cy}`);
+            segs.push(`A${r},${r} 0 1,0 ${cx+r},${cy}`);
+            segs.push(`A${r},${r} 0 1,0 ${cx-r},${cy}`);
+            segs.push('Z');
+          }
+        } else if (g.type === 'GeometryCollection') {
+          // Recursively handle GeometryCollection
+          for (const geom of (g.geometries || [])) {
+            buildGeometryPath(geom);
+          }
         }
-      }
+      };
+      
+      buildGeometryPath(f.geometry);
       return segs.join(' ');
     };
   const update = () => {
@@ -230,10 +276,46 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
 }
 
 function* coordIter(f: GeoJSONFeature): Iterable<[number, number]> {
-  const g: any = f.geometry;
-  if (g.type === 'Polygon') {
-    for (const ring of g.coordinates as any[]) for (const c of ring) yield c as [number,number];
-  } else if (g.type === 'MultiPolygon') {
-    for (const poly of g.coordinates as any[]) for (const ring of poly) for (const c of ring) yield c as [number,number];
+  yield* geometryCoordIter(f.geometry);
+}
+
+/**
+ * Recursively iterates coordinates from any geometry type including GeometryCollections.
+ */
+function* geometryCoordIter(g: any): Iterable<[number, number]> {
+  if (!g || !g.type) return;
+  
+  switch (g.type) {
+    case 'Point':
+      yield g.coordinates as [number, number];
+      break;
+    case 'MultiPoint':
+      for (const c of g.coordinates as any[]) yield c as [number, number];
+      break;
+    case 'LineString':
+      for (const c of g.coordinates as any[]) yield c as [number, number];
+      break;
+    case 'MultiLineString':
+      for (const line of g.coordinates as any[]) {
+        for (const c of line) yield c as [number, number];
+      }
+      break;
+    case 'Polygon':
+      for (const ring of g.coordinates as any[]) {
+        for (const c of ring) yield c as [number, number];
+      }
+      break;
+    case 'MultiPolygon':
+      for (const poly of g.coordinates as any[]) {
+        for (const ring of poly) {
+          for (const c of ring) yield c as [number, number];
+        }
+      }
+      break;
+    case 'GeometryCollection':
+      for (const geom of (g.geometries || [])) {
+        yield* geometryCoordIter(geom);
+      }
+      break;
   }
 }

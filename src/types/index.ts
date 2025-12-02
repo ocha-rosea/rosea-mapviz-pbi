@@ -22,6 +22,34 @@ export interface HighContrastColors {
     /** Color for hyperlinks and interactive elements */
     hyperlink: string;
 }
+
+// ============================================================================
+// Nested Geometry Styling (for GeometryCollections)
+// ============================================================================
+
+/**
+ * Styling options for nested geometries within GeometryCollections.
+ * Used for IPC-style data where polygons represent areas and points show exact locations.
+ */
+export interface NestedGeometryStyle {
+    /** Whether to show point geometries in GeometryCollections */
+    showPoints: boolean;
+    /** Point radius in pixels */
+    pointRadius: number;
+    /** Point fill color (use 'inherit' to match polygon fill) */
+    pointColor: string;
+    /** Point stroke color */
+    pointStrokeColor: string;
+    /** Point stroke width */
+    pointStrokeWidth: number;
+    
+    /** Whether to show line geometries in GeometryCollections */
+    showLines: boolean;
+    /** Line stroke color (use 'inherit' to match polygon stroke) */
+    lineColor: string;
+    /** Line stroke width */
+    lineWidth: number;
+}
 import { FeatureCollection } from "geojson";
 import * as d3 from "d3";
 import { Collection } from "ol";
@@ -230,6 +258,8 @@ export interface ChoroplethLayerOptions extends LayerOptions {
     selectionManager: ISelectionManager;
     tooltipServiceWrapper: ITooltipServiceWrapper;
     simplificationStrength?: number;
+    /** Styling options for nested geometries in GeometryCollections (points, lines) */
+    nestedGeometryStyle?: NestedGeometryStyle;
     dataPoints?: Array<{
         pcode: string;
         value: number;
@@ -347,6 +377,16 @@ export interface ChoroplethOptions {
     strokeWidth: number;
     layerOpacity: number;
     simplificationStrength?: number;
+
+    // Nested geometry styling (for GeometryCollections)
+    showNestedPoints: boolean;
+    nestedPointRadius: number;
+    nestedPointColor: string;
+    nestedPointStrokeColor: string;
+    nestedPointStrokeWidth: number;
+    showNestedLines: boolean;
+    nestedLineColor: string;
+    nestedLineWidth: number;
 
     showLegend: boolean;
     legendLabelPosition: LegendLabelPosition;

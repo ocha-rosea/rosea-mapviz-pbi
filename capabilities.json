@@ -559,6 +559,58 @@
           "type": {
             "numeric": true
           }
+        },
+        "showNestedPoints": {
+          "type": {
+            "bool": true
+          }
+        },
+        "nestedPointRadius": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "nestedPointColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "nestedPointStrokeColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "nestedPointStrokeWidth": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "showNestedLines": {
+          "type": {
+            "bool": true
+          }
+        },
+        "nestedLineColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "nestedLineWidth": {
+          "type": {
+            "numeric": true
+          }
         }
       }
     },

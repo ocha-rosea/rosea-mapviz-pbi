@@ -490,6 +490,16 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 measureValues: colorMeasure.values,
                 dataPoints,
                 simplificationStrength: choroplethOptions.simplificationStrength,
+                nestedGeometryStyle: {
+                    showPoints: choroplethOptions.showNestedPoints,
+                    pointRadius: choroplethOptions.nestedPointRadius,
+                    pointColor: choroplethOptions.nestedPointColor,
+                    pointStrokeColor: choroplethOptions.nestedPointStrokeColor,
+                    pointStrokeWidth: choroplethOptions.nestedPointStrokeWidth,
+                    showLines: choroplethOptions.showNestedLines,
+                    lineColor: choroplethOptions.nestedLineColor,
+                    lineWidth: choroplethOptions.nestedLineWidth,
+                },
             });
 
             this.renderChoroplethLayerOnMap(layerOptions, mapToolsOptions);

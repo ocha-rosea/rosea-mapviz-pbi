@@ -656,3 +656,116 @@ export class ChoroplethLegendSettingsGroup extends formattingSettings.SimpleCard
         this.legendItemMargin
     ];
 }
+
+/**
+ * Settings group for nested geometry styling in GeometryCollections.
+ * Useful for IPC-style data where polygons represent areas and points show exact locations.
+ */
+export class ChoroplethNestedGeometrySettingsGroup extends formattingSettings.SimpleCard {
+    showNestedPoints: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+        name: "showNestedPoints",
+        displayName: "Show Points",
+        value: true
+    });
+
+    nestedPointRadius: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "nestedPointRadius",
+        displayName: "Point Radius",
+        value: 4,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 20
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 1
+            }
+        }
+    });
+
+    nestedPointColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "nestedPointColor",
+        displayName: "Point Color",
+        value: { value: "#000000" },
+        description: "Fill color for point geometries. Set to match polygon for inherited coloring."
+    });
+
+    nestedPointStrokeColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "nestedPointStrokeColor",
+        displayName: "Point Stroke Color",
+        value: { value: "#ffffff" }
+    });
+
+    nestedPointStrokeWidth: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "nestedPointStrokeWidth",
+        displayName: "Point Stroke Width",
+        value: 1,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 5
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    showNestedLines: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+        name: "showNestedLines",
+        displayName: "Show Lines",
+        value: true
+    });
+
+    nestedLineColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "nestedLineColor",
+        displayName: "Line Color",
+        value: { value: "#333333" }
+    });
+
+    nestedLineWidth: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "nestedLineWidth",
+        displayName: "Line Width",
+        value: 2,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 10
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 1
+            }
+        }
+    });
+
+    name: string = "choroplethNestedGeometrySettingsGroup";
+    displayName: string = "Nested Geometries";
+    description: string = "Style settings for point and line geometries within GeometryCollections (e.g., IPC area data with location markers)";
+    slices: formattingSettings.Slice[] = [
+        this.showNestedPoints,
+        this.nestedPointRadius,
+        this.nestedPointColor,
+        this.nestedPointStrokeColor,
+        this.nestedPointStrokeWidth,
+        this.showNestedLines,
+        this.nestedLineColor,
+        this.nestedLineWidth
+    ];
+
+    public applyConditionalDisplayRules(): void {
+        // Show point styling options only if points are enabled
+        const showPoints = this.showNestedPoints.value === true;
+        this.nestedPointRadius.visible = showPoints;
+        this.nestedPointColor.visible = showPoints;
+        this.nestedPointStrokeColor.visible = showPoints;
+        this.nestedPointStrokeWidth.visible = showPoints;
+
+        // Show line styling options only if lines are enabled
+        const showLines = this.showNestedLines.value === true;
+        this.nestedLineColor.visible = showLines;
+        this.nestedLineWidth.visible = showLines;
+    }
+}

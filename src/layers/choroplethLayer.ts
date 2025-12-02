@@ -1,8 +1,8 @@
 import { Layer } from 'ol/layer.js';
 import { fromLonLat } from 'ol/proj.js';
 import { State } from 'ol/source/Source';
-import { ChoroplethLayerOptions, GeoJSONFeature } from '../types/index';
-import { geoBounds, geoPath } from 'd3-geo';
+import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../types/index';
+import { geoBounds, geoPath, geoMercator } from 'd3-geo';
 import { Extent } from 'ol/extent.js';
 import { FrameState } from 'ol/Map';
 import { DomIds } from "../constants/strings";
@@ -24,6 +24,18 @@ const isNoDataValue = (value: any): boolean => {
         return value.trim().length === 0;
     }
     return false;
+};
+
+// Default nested geometry style
+const DEFAULT_NESTED_STYLE: NestedGeometryStyle = {
+    showPoints: true,
+    pointRadius: 4,
+    pointColor: '#000000',
+    pointStrokeColor: '#ffffff',
+    pointStrokeWidth: 1,
+    showLines: true,
+    lineColor: '#333333',
+    lineWidth: 2
 };
 
 export class ChoroplethLayer extends Layer {
@@ -124,6 +136,11 @@ export class ChoroplethLayer extends Layer {
 
         // Create a group element for choropleth
     const choroplethGroup = this.svg.append('g').attr('id', DomIds.ChoroplethGroup);
+    
+    // Create sub-groups for proper z-order: polygons < lines < points
+    const polygonGroup = choroplethGroup.append('g').attr('class', 'choropleth-polygons');
+    const lineGroup = choroplethGroup.append('g').attr('class', 'choropleth-lines');
+    const pointGroup = choroplethGroup.append('g').attr('class', 'choropleth-points');
 
         // Create a lookup for data points
         const dataPointsLookup = this.options.dataPoints?.reduce((acc, dpoint) => {
@@ -133,8 +150,11 @@ export class ChoroplethLayer extends Layer {
 
     // Simplify features dynamically based on zoom level with topology-preserving LODs
     const simplified = this.getSimplifiedGeoJsonForResolution(resolution);
+    
+    // Get nested geometry styling
+    const nestedStyle: NestedGeometryStyle = this.options.nestedGeometryStyle || DEFAULT_NESTED_STYLE;
 
-        // Render features
+        // Render features - now with separate passes for polygon, line, and point geometries
     simplified.features.forEach((feature: GeoJSONFeature) => {
             const pCode = feature.properties[this.options.dataKey];
             const valueRaw = this.valueLookup[pCode];
@@ -170,49 +190,90 @@ export class ChoroplethLayer extends Layer {
                 strokeColor = this.options.strokeColor;
                 strokeWidth = this.options.strokeWidth;
             }
+            
+            const opacity = selectionOpacity(this.selectedIds, dataPoint?.selectionId, this.options.fillOpacity);
 
-            const path = choroplethGroup.append('path')
-                .datum(feature)
-                .style('cursor', 'pointer')
-                .style('pointer-events', 'all')
-                .attr('d', this.d3Path)
-                .attr('stroke', strokeColor)
-                .attr('stroke-width', strokeWidth)
-                .attr('fill', fillColor)
-                .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, dataPoint?.selectionId, this.options.fillOpacity));
-
-            // Add tooltip
-            if (dataPoint?.tooltip) {
-                this.options.tooltipServiceWrapper.addTooltip(
-                    path,
-                    () => dataPoint.tooltip,
-                    () => dataPoint.selectionId,
-                    true
-                );
+            // Extract and render different geometry types
+            const geometries = this.extractGeometries(feature.geometry);
+            
+            // Render polygons (base layer)
+            for (const geom of geometries.polygons) {
+                const polyFeature = { type: 'Feature', geometry: geom, properties: feature.properties };
+                const path = polygonGroup.append('path')
+                    .datum(polyFeature)
+                    .style('cursor', 'pointer')
+                    .style('pointer-events', 'all')
+                    .attr('d', this.d3Path)
+                    .attr('stroke', strokeColor)
+                    .attr('stroke-width', strokeWidth)
+                    .attr('fill', fillColor)
+                    .attr('fill-opacity', opacity);
+                
+                this.attachInteractions(path, dataPoint);
             }
-
-            // Add click handler for selection (only if interactions are allowed)
-            if (this.options.allowInteractions !== false) {
-                path.on('click', (event: MouseEvent) => {
-                    if (!dataPoint?.selectionId) return;
-
-                    const nativeEvent = event;
-                    this.options.selectionManager.select(dataPoint.selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
-                        .then((selectedIds: ISelectionId[]) => {
-                            this.selectedIds = selectedIds;
-                            this.changed();
-                        });
-                });
-
-                // Add context menu handler for right-click
-                path.on('contextmenu', (event: MouseEvent) => {
-                    event.preventDefault();
-                    const selectionId = dataPoint?.selectionId;
-                    this.options.selectionManager.showContextMenu(
-                        selectionId ? selectionId : {},
-                        { x: event.clientX, y: event.clientY }
-                    );
-                });
+            
+            // Render lines (middle layer)
+            if (nestedStyle.showLines) {
+                for (const geom of geometries.lines) {
+                    const lineFeature = { type: 'Feature', geometry: geom, properties: feature.properties };
+                    const path = lineGroup.append('path')
+                        .datum(lineFeature)
+                        .style('cursor', 'pointer')
+                        .style('pointer-events', 'all')
+                        .attr('d', this.d3Path)
+                        .attr('stroke', nestedStyle.lineColor)
+                        .attr('stroke-width', nestedStyle.lineWidth)
+                        .attr('fill', 'none')
+                        .attr('stroke-linecap', 'round')
+                        .attr('stroke-linejoin', 'round')
+                        .attr('opacity', opacity);
+                    
+                    this.attachInteractions(path, dataPoint);
+                }
+            }
+            
+            // Render points (top layer)
+            if (nestedStyle.showPoints) {
+                for (const geom of geometries.points) {
+                    const coords = geom.type === 'Point' 
+                        ? [geom.coordinates] 
+                        : geom.coordinates;
+                    
+                    for (const coord of coords) {
+                        const projected = d3Projection(coord as [number, number]);
+                        if (!projected) continue;
+                        
+                        const circle = pointGroup.append('circle')
+                            .attr('cx', projected[0])
+                            .attr('cy', projected[1])
+                            .attr('r', nestedStyle.pointRadius)
+                            .attr('fill', nestedStyle.pointColor)
+                            .attr('stroke', nestedStyle.pointStrokeColor)
+                            .attr('stroke-width', nestedStyle.pointStrokeWidth)
+                            .attr('opacity', opacity)
+                            .style('cursor', 'pointer')
+                            .style('pointer-events', 'all');
+                        
+                        this.attachInteractions(circle, dataPoint);
+                    }
+                }
+            }
+            
+            // If no polygons were rendered (e.g., original single polygon/multipolygon without GeometryCollection),
+            // render the feature directly
+            if (geometries.polygons.length === 0 && 
+                (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')) {
+                const path = polygonGroup.append('path')
+                    .datum(feature)
+                    .style('cursor', 'pointer')
+                    .style('pointer-events', 'all')
+                    .attr('d', this.d3Path)
+                    .attr('stroke', strokeColor)
+                    .attr('stroke-width', strokeWidth)
+                    .attr('fill', fillColor)
+                    .attr('fill-opacity', opacity);
+                
+                this.attachInteractions(path, dataPoint);
             }
         });
 
@@ -222,6 +283,81 @@ export class ChoroplethLayer extends Layer {
     // SVG is mounted once in visual.ts inside svgContainer
 
         return this.options.svgContainer;
+    }
+    
+    /**
+     * Attaches tooltip and click/contextmenu handlers to an SVG element.
+     */
+    private attachInteractions(element: any, dataPoint: any) {
+        // Add tooltip
+        if (dataPoint?.tooltip) {
+            this.options.tooltipServiceWrapper.addTooltip(
+                element,
+                () => dataPoint.tooltip,
+                () => dataPoint.selectionId,
+                true
+            );
+        }
+
+        // Add click handler for selection (only if interactions are allowed)
+        if (this.options.allowInteractions !== false) {
+            element.on('click', (event: MouseEvent) => {
+                if (!dataPoint?.selectionId) return;
+
+                const nativeEvent = event;
+                this.options.selectionManager.select(dataPoint.selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                    .then((selectedIds: ISelectionId[]) => {
+                        this.selectedIds = selectedIds;
+                        this.changed();
+                    });
+            });
+
+            // Add context menu handler for right-click
+            element.on('contextmenu', (event: MouseEvent) => {
+                event.preventDefault();
+                const selectionId = dataPoint?.selectionId;
+                this.options.selectionManager.showContextMenu(
+                    selectionId ? selectionId : {},
+                    { x: event.clientX, y: event.clientY }
+                );
+            });
+        }
+    }
+    
+    /**
+     * Extracts and categorizes geometries from a feature, handling GeometryCollections.
+     */
+    private extractGeometries(geometry: any): { polygons: any[], lines: any[], points: any[] } {
+        const result = { polygons: [] as any[], lines: [] as any[], points: [] as any[] };
+        this.collectGeometries(geometry, result);
+        return result;
+    }
+    
+    /**
+     * Recursively collects geometries by type.
+     */
+    private collectGeometries(geom: any, result: { polygons: any[], lines: any[], points: any[] }) {
+        if (!geom || !geom.type) return;
+        
+        switch (geom.type) {
+            case 'Point':
+            case 'MultiPoint':
+                result.points.push(geom);
+                break;
+            case 'LineString':
+            case 'MultiLineString':
+                result.lines.push(geom);
+                break;
+            case 'Polygon':
+            case 'MultiPolygon':
+                result.polygons.push(geom);
+                break;
+            case 'GeometryCollection':
+                for (const g of (geom.geometries || [])) {
+                    this.collectGeometries(g, result);
+                }
+                break;
+        }
     }
 
     // Retrieve a simplified GeoJSON based on resolution using TopoJSON thresholds; fallback to original if topology unavailable
