@@ -8,12 +8,13 @@ import { ChoroplethDataService } from "../services/ChoroplethDataService";
 import { LegendService } from "../services/LegendService";
 import { ChoroplethLayer } from "../layers/choroplethLayer";
 import { ChoroplethWebGLLayer } from "../layers/webgl/choroplethWebGLLayer";
-import { ChoroplethData, ChoroplethDataSet, ChoroplethLayerOptions, ChoroplethOptions, MapToolsOptions } from "../types";
+import { ChoroplethData, ChoroplethDataSet, ChoroplethLayerOptions, ChoroplethOptions, MapToolsOptions, PreparedGeometry } from "../types";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.extensibility.ISelectionId;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import * as requestHelpers from "../utils/requestHelpers";
+import { GeometrySimplificationService, SimplificationOptions } from "../services/GeometrySimplificationService";
 import { VisualConfig } from "../config/VisualConfig";
 import { GeoBoundariesService } from "../services/GeoBoundariesService";
 import { GeoBoundariesCatalogService } from "../services/GeoBoundariesCatalogService";
@@ -479,8 +480,38 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 return;
             }
 
+            // Phase 2: Apply centralized geometry simplification before rendering
+            // Detects source type (TopoJSON skips simplification) and applies evidence-based thresholds
+            const sourceType = GeometrySimplificationService.detectSourceType(data.data);
+            const simplificationOptions: SimplificationOptions = {
+                sourceType,
+                strength: choroplethOptions.simplificationStrength ?? 50,
+                autoDetect: true  // Use evidence-based thresholds
+            };
+            
+            const simplificationResult = GeometrySimplificationService.process(
+                processedGeoData,
+                simplificationOptions
+            );
+            
+            // Create prepared geometry for layer options
+            const preparedGeometry: PreparedGeometry = {
+                geojson: simplificationResult.geojson,
+                wasSimplified: simplificationResult.wasSimplified,
+                level: simplificationResult.level,
+                tolerance: simplificationResult.tolerance,
+                metrics: {
+                    featureCount: simplificationResult.metrics.featureCount,
+                    totalVertices: simplificationResult.metrics.totalVertices,
+                    avgVerticesPerFeature: simplificationResult.metrics.avgVerticesPerFeature,
+                    geometryTypes: simplificationResult.metrics.geometryTypes
+                },
+                sourceType
+            };
+
             const layerOptions: ChoroplethLayerOptions = this.choroplethOptsBuilder.build({
-                geojson: processedGeoData,
+                // Use simplified geometry from the service
+                geojson: preparedGeometry.geojson,
                 strokeColor: choroplethOptions.strokeColor,
                 strokeWidth: choroplethOptions.strokeWidth,
                 fillOpacity: choroplethOptions.layerOpacity,
@@ -490,6 +521,8 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 measureValues: colorMeasure.values,
                 dataPoints,
                 simplificationStrength: choroplethOptions.simplificationStrength,
+                // Pass prepared geometry for layers that want to inspect it
+                preparedGeometry,
                 nestedGeometryStyle: {
                     showPoints: choroplethOptions.showNestedPoints,
                     pointRadius: choroplethOptions.nestedPointRadius,

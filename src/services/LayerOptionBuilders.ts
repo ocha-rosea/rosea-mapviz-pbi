@@ -1,6 +1,6 @@
 "use strict";
 
-import { CircleLayerOptions, CircleOptions, ChoroplethLayerOptions, HighContrastColors, NestedGeometryStyle } from "../types";
+import { CircleLayerOptions, CircleOptions, ChoroplethLayerOptions, HighContrastColors, NestedGeometryStyle, PreparedGeometry } from "../types";
 import * as d3 from "d3";
 import powerbi from "powerbi-visuals-api";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
@@ -132,6 +132,7 @@ export class ChoroplethLayerOptionsBuilder {
         measureValues: number[];
         dataPoints: any[];
         simplificationStrength?: number;
+        preparedGeometry?: PreparedGeometry;
         nestedGeometryStyle?: NestedGeometryStyle;
     }): ChoroplethLayerOptions {
         return {
@@ -149,6 +150,7 @@ export class ChoroplethLayerOptionsBuilder {
             selectionManager: this.selectionManager,
             tooltipServiceWrapper: this.tooltipServiceWrapper,
             simplificationStrength: params.simplificationStrength,
+            preparedGeometry: params.preparedGeometry,
             nestedGeometryStyle: params.nestedGeometryStyle,
             dataPoints: params.dataPoints,
             allowInteractions: this.allowInteractions,

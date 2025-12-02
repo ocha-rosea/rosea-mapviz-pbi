@@ -50,6 +50,44 @@ export interface NestedGeometryStyle {
     /** Line stroke width */
     lineWidth: number;
 }
+
+// ============================================================================
+// Geometry Simplification Types
+// ============================================================================
+
+/**
+ * Represents pre-processed geometry data for rendering.
+ * Computed once by GeometrySimplificationService and shared across all render engines.
+ */
+export interface PreparedGeometry {
+    /** Simplified GeoJSON (same structure as input, maintains 1-1 feature mapping) */
+    geojson: import("geojson").FeatureCollection;
+    
+    /** Whether simplification was applied */
+    wasSimplified: boolean;
+    
+    /** Simplification level used */
+    level: 'none' | 'light' | 'moderate' | 'aggressive';
+    
+    /** Tolerance value used (in degrees) */
+    tolerance: number;
+    
+    /** Metrics about the original dataset */
+    metrics: {
+        /** Total number of features */
+        featureCount: number;
+        /** Total vertex count across all geometries */
+        totalVertices: number;
+        /** Average vertices per feature */
+        avgVerticesPerFeature: number;
+        /** Set of geometry types present */
+        geometryTypes: Set<string>;
+    };
+    
+    /** Source data type */
+    sourceType: 'topojson' | 'geojson';
+}
+
 import { FeatureCollection } from "geojson";
 import * as d3 from "d3";
 import { Collection } from "ol";
@@ -258,6 +296,8 @@ export interface ChoroplethLayerOptions extends LayerOptions {
     selectionManager: ISelectionManager;
     tooltipServiceWrapper: ITooltipServiceWrapper;
     simplificationStrength?: number;
+    /** Pre-processed geometry from GeometrySimplificationService (Phase 2 integration) */
+    preparedGeometry?: PreparedGeometry;
     /** Styling options for nested geometries in GeometryCollections (points, lines) */
     nestedGeometryStyle?: NestedGeometryStyle;
     dataPoints?: Array<{

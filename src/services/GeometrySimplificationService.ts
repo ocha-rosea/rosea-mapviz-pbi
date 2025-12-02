@@ -726,6 +726,32 @@ export class GeometrySimplificationService {
   // ==========================================================================
   
   /**
+   * Detects whether the source data is TopoJSON or GeoJSON.
+   * TopoJSON sources should skip simplification (already optimized).
+   * 
+   * @param data - Raw data object from fetch
+   * @returns 'topojson' or 'geojson'
+   */
+  static detectSourceType(data: any): 'topojson' | 'geojson' {
+    if (!data || typeof data !== 'object') {
+      return 'geojson';
+    }
+    
+    // TopoJSON has a 'type' of 'Topology' and 'objects' property
+    if (data.type === 'Topology' && data.objects) {
+      return 'topojson';
+    }
+    
+    // Check if it has arcs (TopoJSON-specific)
+    if (Array.isArray(data.arcs)) {
+      return 'topojson';
+    }
+    
+    // Default to GeoJSON
+    return 'geojson';
+  }
+  
+  /**
    * Checks if a dataset should skip simplification (e.g., point-only data).
    */
   static shouldSkipSimplification(metrics: SimplificationMetrics): boolean {
