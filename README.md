@@ -20,6 +20,13 @@ Rendering engines
 - Legends, tooltips, cross-filtering, zoom control
 - Auto-fit to data; topology-preserving simplification (strength control)
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/choropleth_and_pie_map.png" alt="Choropleth and Pie Chart Map" width="45%" />
+  <img src="assets/pie_chart_map.png" alt="Pie Chart Map" width="45%" />
+</p>
+
 ## Data roles
 
 Assign only what you need for the layers you enable (Power BI Visualizations pane).

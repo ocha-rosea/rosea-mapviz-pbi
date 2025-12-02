@@ -141,13 +141,6 @@ export class ProportionalCirclesLegendSettingsGroup extends formattingSettings.S
         value: false
     });
 
-    legendTitle: formattingSettings.TextInput = new formattingSettings.TextInput({
-        name: "legendTitle",
-        displayName: "Legend Title",
-        value: "Legend",
-        placeholder: ""
-    });
-
     legendTitleColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
         name: "legendTitleColor",
         displayName: "Legend Title Color",
@@ -281,7 +274,6 @@ export class ProportionalCirclesLegendSettingsGroup extends formattingSettings.S
     collapsible: boolean = false;
     slices: formattingSettings.Slice[] = [
         this.showLegend,
-        this.legendTitle,
         this.legendTitleColor,
         this.legendItemStrokeColor,
         this.legendItemStrokeWidth,

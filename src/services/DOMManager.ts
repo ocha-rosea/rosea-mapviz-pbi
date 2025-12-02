@@ -9,7 +9,7 @@
 
 import * as d3 from "d3";
 import { DomIds, LegendPositions } from "../constants/strings";
-import { ROSEA_LOGO_PATHS, ROSEA_LOGO_VIEWBOX, ROSEA_LOGO_FILL } from "../assets/roseaLogo";
+import { MAPVIZ_LOGO_PATHS, MAPVIZ_LOGO_VIEWBOX, MAPVIZ_LOGO_FILL } from "../assets/roseaLogo";
 import type { LocalizationService } from "./LocalizationService";
 
 /**
@@ -369,14 +369,14 @@ export class DOMManager {
         // Create inline SVG using DOM methods (Power BI sandbox blocks data URLs for img src)
         const svgNS = 'http://www.w3.org/2000/svg';
         const iconSvg = document.createElementNS(svgNS, 'svg');
-        iconSvg.setAttribute('viewBox', ROSEA_LOGO_VIEWBOX);
+        iconSvg.setAttribute('viewBox', MAPVIZ_LOGO_VIEWBOX);
         iconSvg.setAttribute('width', '40');
         iconSvg.setAttribute('height', '40');
         iconSvg.setAttribute('aria-label', 'ROSEA MapViz');
-        // ROSEA logo paths (imported from src/assets/roseaLogo.ts)
-        ROSEA_LOGO_PATHS.forEach(d => {
+        // MAPVIZ logo paths (imported from src/assets/roseaLogo.ts)
+        MAPVIZ_LOGO_PATHS.forEach(d => {
             const path = document.createElementNS(svgNS, 'path');
-            path.setAttribute('fill', ROSEA_LOGO_FILL);
+            path.setAttribute('fill', MAPVIZ_LOGO_FILL);
             path.setAttribute('d', d);
             iconSvg.appendChild(path);
         });

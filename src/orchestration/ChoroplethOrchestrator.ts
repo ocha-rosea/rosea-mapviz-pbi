@@ -192,11 +192,15 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                     choroplethLegendContainer.style.display = "flex";
                 }
                 const formatString = colorMeasure?.source?.format;
+                // Override legend title with colorMeasure display name if available
+                const legendOptionsWithTitle = colorMeasure?.source?.displayName
+                    ? { ...choroplethOptions, legendTitle: colorMeasure.source.displayName }
+                    : choroplethOptions;
                 this.legendService.createChoroplethLegend(
                     colorValues,
                     classBreaks as any,
                     colorScale as any,
-                    choroplethOptions,
+                    legendOptionsWithTitle,
                     undefined,
                     formatString,
                     this.host.locale

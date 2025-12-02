@@ -186,6 +186,9 @@ export class CircleOrchestrator extends BaseOrchestrator {
 
         const circleMeasureLegendEntries = this.buildCircleMeasureLegendEntries(circleSizeValuesObjects, circleOptions);
 
+        // Derive legend title from circle size measure display names
+        const circleLegendTitle = this.buildCircleLegendTitle(circleSizeValuesObjects);
+
         if (circleOptions.showLegend) {
             this.renderCircleLegend(
                 combinedCircleSizeValues,
@@ -195,7 +198,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
                 circleScale,
                 selectedScalingMethod,
                 circleOptions,
-                circleMeasureLegendEntries
+                circleMeasureLegendEntries,
+                circleLegendTitle
             );
         } else {
             this.legendService.hideLegend("circle");
@@ -329,8 +333,13 @@ export class CircleOrchestrator extends BaseOrchestrator {
         circleScale: number,
         selectedScalingMethod: string,
         circleOptions: CircleOptions,
-        circleMeasureLegendEntries?: CircleMeasureLegendEntry[]
+        circleMeasureLegendEntries?: CircleMeasureLegendEntry[],
+        legendTitle?: string
     ): void {
+        // Override legend title with measure display name(s) if available
+        if (legendTitle) {
+            circleOptions = { ...circleOptions, legendTitle };
+        }
         const validDataValues = combinedCircleSizeValues.filter(v => !isNaN(v) && isFinite(v));
         if (validDataValues.length === 0) return;
         const sortedValues = [...validDataValues].sort((a, b) => a - b);
@@ -419,6 +428,33 @@ export class CircleOrchestrator extends BaseOrchestrator {
         const second = createEntry(circleSizeValuesObjects[1], circleOptions.color2, circleOptions.layer2Opacity);
 
         return [first, second].filter((entry): entry is CircleMeasureLegendEntry => !!entry);
+    }
+
+    /**
+     * Builds the legend title from circle size measure display names.
+     * If two measures are provided, concatenates their names with " / ".
+     * 
+     * @param circleSizeValuesObjects - Array of measure value objects
+     * @returns Legend title string derived from measure display names, or undefined
+     */
+    private buildCircleLegendTitle(circleSizeValuesObjects: any[]): string | undefined {
+        if (!Array.isArray(circleSizeValuesObjects) || circleSizeValuesObjects.length === 0) {
+            return undefined;
+        }
+
+        const displayNames: string[] = [];
+        for (const obj of circleSizeValuesObjects) {
+            const name = obj?.source?.displayName;
+            if (name) {
+                displayNames.push(name);
+            }
+        }
+
+        if (displayNames.length === 0) {
+            return undefined;
+        }
+
+        return displayNames.join(" / ");
     }
 
     // findClosestValue moved to src/math/circles.ts

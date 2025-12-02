@@ -99,7 +99,7 @@ export class OptionsService {
             layer1Opacity: circleSettings.proportionalCirclesDisplaySettingsGroup.proportionalCircles1LayerOpacity.value / 100,
             layer2Opacity: circleSettings.proportionalCirclesDisplaySettingsGroup.proportionalCircles2LayerOpacity.value / 100,
             showLegend: circleSettings.proportionalCirclesLegendSettingsGroup.showLegend.value,
-            legendTitle: circleSettings.proportionalCirclesLegendSettingsGroup.legendTitle.value,
+            legendTitle: '', // Set dynamically from data role display name
             legendTitleColor: circleSettings.proportionalCirclesLegendSettingsGroup.legendTitleColor.value.value,
             legendItemStrokeColor: circleSettings.proportionalCirclesLegendSettingsGroup.legendItemStrokeColor.value.value,
             legendItemStrokeWidth: circleSettings.proportionalCirclesLegendSettingsGroup.legendItemStrokeWidth.value,
@@ -156,7 +156,7 @@ export class OptionsService {
             layerOpacity: choroplethDisplaySettings.layerOpacity.value / 100,
             simplificationStrength: choroplethDisplaySettings.simplificationStrength.value,
             showLegend: choroplethLegendSettings.showLegend.value,
-            legendTitle: choroplethLegendSettings.legendTitle.value,
+            legendTitle: '', // Set dynamically from data role display name
             legendTitleAlignment: choroplethLegendSettings.legendTitleAlignment.value.value.toString(),
             legendOrientation: choroplethLegendSettings.legendOrientation.value.value as import("../types").LegendOrientation,
             legendLabelPosition: choroplethLegendSettings.legendLabelPosition.value.value as import("../types").LegendLabelPosition,

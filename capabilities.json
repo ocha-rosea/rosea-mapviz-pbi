@@ -332,11 +332,6 @@
             "bool": true
           }
         },
-        "legendTitle": {
-          "type": {
-            "text": true
-          }
-        },
         "legendTitleColor": {
           "type": {
             "fill": {
@@ -524,11 +519,6 @@
         "showLegend": {
           "type": {
             "bool": true
-          }
-        },
-        "legendTitle": {
-          "type": {
-            "text": true
           }
         },
         "legendTitleAlignment": {

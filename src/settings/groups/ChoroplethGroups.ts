@@ -573,13 +573,6 @@ export class ChoroplethLegendSettingsGroup extends formattingSettings.SimpleCard
         value: false
     });
 
-    legendTitle: formattingSettings.TextInput = new formattingSettings.TextInput({
-        name: "legendTitle",
-        displayName: "Legend Title",
-        value: "Legend",
-        placeholder: ""
-    });
-
     legendTitleAlignment: DropDown = new DropDown({
         name: "legendTitleAlignment",
         displayName: "Legend Title Alignment",
@@ -655,7 +648,6 @@ export class ChoroplethLegendSettingsGroup extends formattingSettings.SimpleCard
     displayName: string = "Legend";
     slices: formattingSettings.Slice[] = [
         this.showLegend,
-        this.legendTitle,
         this.legendTitleAlignment,
         this.legendOrientation,
         this.legendLabelPosition,
