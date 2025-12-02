@@ -6,7 +6,7 @@ import { DomIds, ClassificationMethods } from "../constants/strings";
 import Map from "ol/Map";
 import { ChoroplethDataService } from "../services/ChoroplethDataService";
 import { LegendService } from "../services/LegendService";
-import { ChoroplethLayer } from "../layers/choroplethLayer";
+import { ChoroplethSvgLayer } from "../layers/svg/choroplethSvgLayer";
 import { ChoroplethWebGLLayer } from "../layers/webgl/choroplethWebGLLayer";
 import { ChoroplethData, ChoroplethDataSet, ChoroplethLayerOptions, ChoroplethOptions, MapToolsOptions, PreparedGeometry } from "../types";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
@@ -41,7 +41,7 @@ import { UniqueClassificationService } from "../services/UniqueClassificationSer
  */
 export class ChoroplethOrchestrator extends BaseOrchestrator {
     private cacheService: CacheService;
-    private choroplethLayer: ChoroplethLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined;
+    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined;
     private abortController: AbortController | null = null;
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
     private uniqueClassification: UniqueClassificationService;
@@ -109,7 +109,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
      * 
      * @returns The active choropleth layer (Canvas, WebGL, or SVG), or undefined if not rendered
      */
-    public getLayer(): ChoroplethLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined {
+    public getLayer(): ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined {
         return this.choroplethLayer as any;
     }
 
@@ -145,7 +145,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         choroplethOptions: ChoroplethOptions,
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions
-    ): Promise<ChoroplethLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined> {
+    ): Promise<ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined> {
         if (choroplethOptions.layerControl == false) {
             const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
             group.selectAll("*").remove();
@@ -560,7 +560,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             ? (hasValidGeoJSON ? new ChoroplethWebGLLayer(layerOptions) : new ChoroplethCanvasLayer(layerOptions))
             : mapToolsOptions.renderEngine === 'canvas'
                 ? new ChoroplethCanvasLayer(layerOptions)
-                : new ChoroplethLayer(layerOptions);
+                : new ChoroplethSvgLayer(layerOptions);
     this.map.addLayer(this.choroplethLayer);
     try { (this.choroplethLayer as any).attachHitLayer?.(this.map); } catch {}
         if (mapToolsOptions.lockMapExtent === false) {

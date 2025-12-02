@@ -7,7 +7,7 @@ import Map from "ol/Map";
 import { VisualConfig } from "../config/VisualConfig";
 import { ChoroplethDataService } from "../services/ChoroplethDataService";
 import { LegendService, CircleMeasureLegendEntry } from "../services/LegendService";
-import { CircleLayer } from "../layers/circleLayer";
+import { CircleSvgLayer } from "../layers/svg/circleSvgLayer";
 import { CircleCanvasLayer } from "../layers/canvas/circleCanvasLayer";
 import { CircleData, CircleLayerOptions, CircleOptions, MapToolsOptions } from "../types";
 import { CircleWebGLLayer } from "../layers/webgl/circleWebGLLayer";
@@ -39,7 +39,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
     /** Builder for constructing circle layer options */
     private circleOptsBuilder: CircleLayerOptionsBuilder;
     /** Current circle layer instance (SVG, Canvas, or WebGL) */
-    private circleLayer: CircleLayer | CircleCanvasLayer | CircleWebGLLayer | undefined;
+    private circleLayer: CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined;
 
     /**
      * Creates a new CircleOrchestrator.
@@ -92,7 +92,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
      * 
      * @returns The active circle layer or undefined if not rendered
      */
-    public getLayer(): CircleLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
+    public getLayer(): CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
         return this.circleLayer;
     }
 
@@ -124,7 +124,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions,
         choroplethDisplayed: boolean
-    ): CircleLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
+    ): CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
         if (circleOptions.layerControl == false) {
             const group1 = this.svg.select(`#${DomIds.CirclesGroup1}`);
             const group2 = this.svg.select(`#${DomIds.CirclesGroup2}`);
@@ -299,7 +299,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             ? (needCanvasForCharts ? new CircleCanvasLayer(circleLayerOptions) : new CircleWebGLLayer(circleLayerOptions))
             : engine === 'canvas'
                 ? new CircleCanvasLayer(circleLayerOptions)
-                : new CircleLayer(circleLayerOptions);
+                : new CircleSvgLayer(circleLayerOptions);
     this.map.addLayer(this.circleLayer);
     // Attach hit overlay for WebGL only
     try { (this.circleLayer as any).attachHitLayer?.(this.map); } catch {}

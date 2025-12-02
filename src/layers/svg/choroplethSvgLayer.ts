@@ -1,18 +1,16 @@
 import { Layer } from 'ol/layer.js';
 import { fromLonLat } from 'ol/proj.js';
 import { State } from 'ol/source/Source';
-import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../types/index';
+import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../../types/index';
 import { geoBounds, geoPath, geoMercator } from 'd3-geo';
 import { Extent } from 'ol/extent.js';
 import { FrameState } from 'ol/Map';
-import { DomIds } from "../constants/strings";
+import { DomIds } from "../../constants/strings";
 import rbush from 'rbush';
-import { topology } from 'topojson-server';
-import { feature as topoFeature } from 'topojson-client';
-import { presimplify, simplify as topoSimplify, quantile as topoQuantile } from 'topojson-simplify';
+// TopoJSON imports removed - simplification now handled by GeometrySimplificationService in orchestrator
 import ISelectionId = powerbi.visuals.ISelectionId;
-import { createWebMercatorProjection } from "../utils/map";
-import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../utils/graphics";
+import { createWebMercatorProjection } from "../../utils/map";
+import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
 
 const NO_DATA_COLOR = "rgba(0,0,0,0)";
 const isNoDataValue = (value: any): boolean => {
@@ -38,7 +36,14 @@ const DEFAULT_NESTED_STYLE: NestedGeometryStyle = {
     lineWidth: 2
 };
 
-export class ChoroplethLayer extends Layer {
+/**
+ * SVG-based choropleth layer for rendering filled polygon maps.
+ * Uses D3.js for path generation and SVG rendering.
+ * 
+ * Note: Geometry simplification is now handled by GeometrySimplificationService
+ * in the orchestrator layer (Phase 3 refactoring).
+ */
+export class ChoroplethSvgLayer extends Layer {
 
     private svg: any;
     private geojson: any;
@@ -48,11 +53,8 @@ export class ChoroplethLayer extends Layer {
     private d3Path: any;
     private selectedIds: powerbi.extensibility.ISelectionId[] = [];
     private isActive: boolean = true;
-    private simplifiedCache: Map<string, any>;
-    private topo: any;
-    private topoPresimplified: any;
-    private topoThresholds: { coarse: number; low: number; medium: number; high: number; max: number };
-    private simplificationStrength: number = 50; // 0-100
+    // Internal TopoJSON LOD fields removed - simplification now handled by orchestrator
+    // TODO (Phase 4): Revisit zoom-level simplification for all engines
 
     constructor(options: ChoroplethLayerOptions) {
         super({ ...options, zIndex: options.zIndex || 10 });
@@ -60,9 +62,7 @@ export class ChoroplethLayer extends Layer {
         this.svg = options.svg;
         this.options = options;
         this.geojson = options.geojson;
-        if (typeof options.simplificationStrength === 'number') {
-            this.simplificationStrength = Math.max(0, Math.min(100, options.simplificationStrength));
-        }
+        // simplificationStrength no longer used - handled by orchestrator
 
         // Create a lookup table for measure values
         this.valueLookup = {};
@@ -87,21 +87,8 @@ export class ChoroplethLayer extends Layer {
         this.spatialIndex.load(features);
 
         this.d3Path = null;
-        this.simplifiedCache = new Map();
-
-        // Build a topology from GeoJSON once, with quantization to reduce precision (and size) safely for web rendering
-        try {
-            // Wrap the collection under a named object; we'll refer to it as 'layer'
-            this.topo = topology({ layer: this.geojson });
-            // Compute triangle areas for effective topology-preserving simplify
-            this.topoPresimplified = presimplify(this.topo);
-            this.recomputeThresholds();
-        } catch (e) {
-            // Fallback: leave topo undefined; will render original GeoJSON
-            this.topo = undefined;
-            this.topoPresimplified = undefined;
-            this.topoThresholds = { coarse: 0, low: 0, medium: 0, high: 0, max: 0 };
-        }
+        // Geometry is pre-simplified by orchestrator via GeometrySimplificationService
+        // No internal TopoJSON conversion or LOD caching needed
 
         this.changed();
     }
@@ -360,63 +347,10 @@ export class ChoroplethLayer extends Layer {
         }
     }
 
-    // Retrieve a simplified GeoJSON based on resolution using TopoJSON thresholds; fallback to original if topology unavailable
-    private getSimplifiedGeoJsonForResolution(resolution: number) {
-        if (!this.topoPresimplified) {
-            return this.geojson;
-        }
-
-        const level = this.getLodLevel(resolution);
-        const cacheKey = `lod:${level}`;
-        const cached = this.simplifiedCache.get(cacheKey);
-        if (cached) return cached;
-
-    const threshold = this.getThresholdForLevel(level);
-    const simplifiedTopo = topoSimplify(this.topoPresimplified, threshold);
-    const geo = topoFeature(simplifiedTopo, simplifiedTopo.objects.layer);
-
-        // Cap cache size
-        const MAX_ENTRIES = 8;
-        if (this.simplifiedCache.size >= MAX_ENTRIES) {
-            const oldestKey = this.simplifiedCache.keys().next().value;
-            this.simplifiedCache.delete(oldestKey);
-        }
-        this.simplifiedCache.set(cacheKey, geo);
-        return geo;
-    }
-
-    private getLodLevel(resolution: number): 'coarse' | 'low' | 'medium' | 'high' | 'max' {
-        if (resolution > 7500) return 'coarse';
-        if (resolution > 5000) return 'low';
-        if (resolution > 2500) return 'medium';
-        if (resolution > 1000) return 'high';
-        return 'max';
-    }
-
-    private getThresholdForLevel(level: 'coarse' | 'low' | 'medium' | 'high' | 'max'): number {
-        return this.topoThresholds[level] || 0;
-    }
-
-    // Map user strength (0-100) to shifting quantiles per LOD; higher strength => larger threshold => more simplification
-    private recomputeThresholds() {
-        const s = this.simplificationStrength / 100; // 0..1
-        // Base quantiles for LODs, then lerp towards 0.95 (aggressive) as s increases
-        const base = { coarse: 0.8, low: 0.6, medium: 0.4, high: 0.2, max: 0.0 };
-        const target = 0.95; // very aggressive
-        const q = {
-            coarse: base.coarse + (target - base.coarse) * s,
-            low:    base.low    + (target - base.low)    * s,
-            medium: base.medium + (target - base.medium) * s,
-            high:   base.high   + (target - base.high)   * s,
-            max:    base.max    + (target - base.max)    * s,
-        };
-        this.topoThresholds = {
-            coarse: topoQuantile(this.topoPresimplified, q.coarse),
-            low:    topoQuantile(this.topoPresimplified, q.low),
-            medium: topoQuantile(this.topoPresimplified, q.medium),
-            high:   topoQuantile(this.topoPresimplified, q.high),
-            max:    topoQuantile(this.topoPresimplified, q.max),
-        };
+    // Geometry is pre-simplified by orchestrator - just return the geojson directly
+    // TODO (Phase 4): Revisit zoom-level simplification for all engines
+    private getSimplifiedGeoJsonForResolution(_resolution: number) {
+        return this.geojson;
     }
 
     getSpatialIndex() {
@@ -442,6 +376,7 @@ export class ChoroplethLayer extends Layer {
     setSelectedIds(selectionIds: powerbi.extensibility.ISelectionId[]) {
         this.selectedIds = selectionIds;
     }
-
-    // Old numeric tolerance-based simplify removed in favor of topology-preserving LODs
 }
+
+// Re-export with legacy name for backward compatibility
+export { ChoroplethSvgLayer as ChoroplethLayer };

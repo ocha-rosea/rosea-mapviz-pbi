@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 jest.mock('ol/layer.js', () => ({ Layer: class { changed(){} } }));
 jest.mock('ol/proj.js', () => ({ toLonLat: jest.fn(() => [0,0]) }));
 
-import { CircleLayer } from '../../../src/layers/circleLayer';
+import { CircleSvgLayer } from '../../../src/layers/svg/circleSvgLayer';
 import type { CircleLayerOptions } from '../../../src/types';
 import { DomIds } from '../../../src/constants/strings';
 
@@ -62,10 +62,10 @@ function baseOptions(partial?: Partial<CircleLayerOptions>): CircleLayerOptions 
 
 function frameState(resolution=2000): any { return { size:[600,400], viewState:{ center:[0,0], resolution, projection:{ code_: 'EPSG:3857'} } }; }
 
-describe('CircleLayer render variants', () => {
+describe('CircleSvgLayer render variants', () => {
   it('renders nested circle variant with circle elements', () => {
     const opts = baseOptions();
-    const layer = new CircleLayer(opts);
+    const layer = new CircleSvgLayer(opts);
     layer.render(frameState());
     const g1 = (opts.svg as any).select(`#${DomIds.CirclesGroup1}`);
     const g2 = (opts.svg as any).select(`#${DomIds.CirclesGroup2}`);
@@ -78,7 +78,7 @@ describe('CircleLayer render variants', () => {
   it('renders donut chart arcs when chartType=donut-chart', () => {
     const base = baseOptions();
     const opts = baseOptions({ circleOptions: { ...base.circleOptions, chartType: 'donut-chart' } as any });
-    const layer = new CircleLayer(opts);
+    const layer = new CircleSvgLayer(opts);
     layer.render(frameState());
     const g2 = (opts.svg as any).select(`#${DomIds.CirclesGroup2}`);
     const paths = g2.selectAll('path').nodes();
@@ -88,7 +88,7 @@ describe('CircleLayer render variants', () => {
   it('renders pie chart arcs when chartType=pie-chart', () => {
     const base = baseOptions();
     const opts = baseOptions({ circleOptions: { ...base.circleOptions, chartType: 'pie-chart' } as any });
-    const layer = new CircleLayer(opts);
+    const layer = new CircleSvgLayer(opts);
     layer.render(frameState());
     const g2 = (opts.svg as any).select(`#${DomIds.CirclesGroup2}`);
     const paths = g2.selectAll('path').nodes();
@@ -97,7 +97,7 @@ describe('CircleLayer render variants', () => {
 
   it('setActive(false) prevents rendering groups', () => {
     const opts = baseOptions();
-    const layer = new CircleLayer(opts);
+    const layer = new CircleSvgLayer(opts);
     layer.setActive(false);
     layer.render(frameState());
     const g1 = (opts.svg as any).select(`#${DomIds.CirclesGroup1}`);

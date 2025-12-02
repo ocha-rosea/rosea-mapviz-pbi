@@ -7,8 +7,8 @@ function createStubSelection() {
   return { select: (_: string) => ({ selectAll: () => ({ remove: () => {} }) }), append: (_: string) => ({ attr: () => ({}) }), attr: () => ({}) } as any;
 }
 
-jest.mock("../../../src/layers/circleLayer", () => ({
-  CircleLayer: jest.fn().mockImplementation(() => ({ setSelectedIds: jest.fn(), setActive: jest.fn(), getFeaturesExtent: jest.fn().mockReturnValue([0, 0, 1, 1]) }))
+jest.mock("../../../src/layers/svg/circleSvgLayer", () => ({
+  CircleSvgLayer: jest.fn().mockImplementation(() => ({ setSelectedIds: jest.fn(), setActive: jest.fn(), getFeaturesExtent: jest.fn().mockReturnValue([0, 0, 1, 1]) }))
 }));
 
 const mockHost: any = { displayWarningIcon: jest.fn(), createSelectionIdBuilder: () => ({ withCategory: () => ({ withMeasure: () => ({ createSelectionId: () => ({}) }) }) }) };

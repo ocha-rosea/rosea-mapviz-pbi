@@ -4,12 +4,16 @@ import { State } from 'ol/source/Source';
 import { transformExtent } from 'ol/proj.js';
 import { Extent } from 'ol/extent.js';
 import { arc as d3Arc } from 'd3-shape';
-import { CircleLayerOptions, GeoJSONFeature } from '../types/index';
-import { DomIds } from "../constants/strings";
-import { createWebMercatorProjection } from "../utils/map";
-import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../utils/graphics";
+import { CircleLayerOptions, GeoJSONFeature } from '../../types/index';
+import { DomIds } from "../../constants/strings";
+import { createWebMercatorProjection } from "../../utils/map";
+import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
 
-export class CircleLayer extends Layer {
+/**
+ * SVG-based circle layer for rendering proportional symbols and pie/donut charts.
+ * Uses D3.js for circle generation and SVG rendering.
+ */
+export class CircleSvgLayer extends Layer {
 
     private svg: any;
     private features: GeoJSONFeature[];
@@ -471,3 +475,6 @@ export class CircleLayer extends Layer {
     }
 
 }
+
+// Re-export with legacy name for backward compatibility
+export { CircleSvgLayer as CircleLayer };

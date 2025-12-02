@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 jest.mock('ol/layer.js', () => ({ Layer: class { changed(){} } }));
 jest.mock('ol/proj.js', () => ({ toLonLat: jest.fn(() => [0,0]) }));
 
-import { ChoroplethLayer } from '../../../src/layers/choroplethLayer';
+import { ChoroplethSvgLayer } from '../../../src/layers/svg/choroplethSvgLayer';
 import type { ChoroplethLayerOptions, GeoJSON } from '../../../src/types';
 
 function makeGeoJSON(): GeoJSON {
@@ -36,7 +36,15 @@ function makeOptions(partial?: Partial<ChoroplethLayerOptions>): ChoroplethLayer
     measureValues: [1,2,3,4],
     selectionManager: { select: jest.fn().mockResolvedValue([]) } as any,
     tooltipServiceWrapper: { addTooltip: jest.fn() } as any,
-    simplificationStrength: 40, // mid strength for deterministic thresholds
+    // preparedGeometry provided by orchestrator - internal LOD is skipped
+    preparedGeometry: {
+      geojson: geojson as any,
+      wasSimplified: true,
+      level: 'light',
+      tolerance: 0.0001,
+      metrics: { featureCount: 4, totalVertices: 20, avgVerticesPerFeature: 5, geometryTypes: new Set(['Polygon']) },
+      sourceType: 'geojson'
+    },
     ...(partial as any),
   };
 }
@@ -48,38 +56,32 @@ function frameState(resolution: number): any {
   };
 }
 
-describe('ChoroplethLayer LOD simplification', () => {
-  it('builds simplified cache entries for each LOD level', () => {
-    const layer = new ChoroplethLayer(makeOptions());
-    const resolutions = [8000, 6000, 3000, 1500, 800]; // coarse, low, medium, high, max
+describe('ChoroplethSvgLayer simplification (Phase 3 - orchestrator-based)', () => {
+  it('uses geojson directly without internal LOD caching', () => {
+    const layer = new ChoroplethSvgLayer(makeOptions());
+    const resolutions = [8000, 6000, 3000, 1500, 800]; // various zoom levels
     resolutions.forEach(r => layer.render(frameState(r)));
-    const cache: Map<string, any> = (layer as any).simplifiedCache;
-    expect(cache.size).toBe(5);
-    ['coarse','low','medium','high','max'].forEach(level => {
-      expect(cache.has(`lod:${level}`)).toBe(true);
-    });
-  });
-
-  it('re-uses cached simplified GeoJSON on second render for same LOD', () => {
-    const layer = new ChoroplethLayer(makeOptions());
-    const fs = frameState(3200); // medium LOD
-    // Spy on internal simplify call by wrapping method
-    const orig = (layer as any).getSimplifiedGeoJsonForResolution.bind(layer);
-    const spy = jest.fn(orig);
-    (layer as any).getSimplifiedGeoJsonForResolution = spy;
-    layer.render(fs);
-    // Second render should call simplify again but return from cache quickly for same LOD key
-    layer.render(fs);
-    expect(spy).toHaveBeenCalledTimes(2); // method invoked each render
+    // No internal simplifiedCache since LOD is removed
     const cache = (layer as any).simplifiedCache;
-    expect(cache.has('lod:medium')).toBe(true);
+    expect(cache).toBeUndefined();
   });
 
-  it('falls back to original geojson when topology unavailable', () => {
-    const layer = new ChoroplethLayer(makeOptions());
-    (layer as any).topoPresimplified = undefined;
+  it('getSimplifiedGeoJsonForResolution returns geojson directly', () => {
+    const layer = new ChoroplethSvgLayer(makeOptions());
     const original = (layer as any).geojson;
-    const geo = (layer as any).getSimplifiedGeoJsonForResolution(5000);
-    expect(geo).toBe(original);
+    // At any resolution, should return the same geojson (pre-simplified by orchestrator)
+    const geo1 = (layer as any).getSimplifiedGeoJsonForResolution(8000);
+    const geo2 = (layer as any).getSimplifiedGeoJsonForResolution(800);
+    expect(geo1).toBe(original);
+    expect(geo2).toBe(original);
+  });
+
+  it('renders correctly at different resolutions', () => {
+    const layer = new ChoroplethSvgLayer(makeOptions());
+    const fs = frameState(3200);
+    // Should not throw when rendering
+    expect(() => layer.render(fs)).not.toThrow();
+    // Second render at same resolution should also work
+    expect(() => layer.render(fs)).not.toThrow();
   });
 });

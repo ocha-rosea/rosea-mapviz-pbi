@@ -43,8 +43,8 @@ import { MessageService, DOMManager, StateManager, LocalizationService } from ".
 import { RoseaMapVizFormattingSettingsModel } from "./settings"; import "ol/ol.css";
 import Map from "ol/Map";
 import { MapToolsOptions, HighContrastColors } from "./types/index";
-import type { CircleLayer } from "./layers/circleLayer";
-import type { ChoroplethLayer } from "./layers/choroplethLayer";
+import type { CircleSvgLayer } from "./layers/svg/circleSvgLayer";
+import type { ChoroplethSvgLayer } from "./layers/svg/choroplethSvgLayer";
 import type { CircleCanvasLayer } from "./layers/canvas/circleCanvasLayer";
 import type { ChoroplethCanvasLayer } from "./layers/canvas/choroplethCanvasLayer";
 import * as d3 from "d3";
@@ -85,8 +85,8 @@ export class RoseaMapViz implements IVisual {
     private mapToolsOptions: MapToolsOptions;
     
     // Layers
-    private circleLayer: CircleLayer | CircleCanvasLayer;
-    private choroplethLayer: ChoroplethLayer | ChoroplethCanvasLayer;
+    private circleLayer: CircleSvgLayer | CircleCanvasLayer;
+    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer;
     private choroplethDisplayed: boolean = false;
     
     // Orchestrators

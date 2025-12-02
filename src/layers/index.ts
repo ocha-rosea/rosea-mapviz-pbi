@@ -12,9 +12,9 @@
  * ```
  */
 
-// Core layers (SVG-based)
-export { CircleLayer } from "./circleLayer";
-export { ChoroplethLayer } from "./choroplethLayer";
+// SVG-based layers
+export { CircleSvgLayer, CircleLayer } from "./svg/circleSvgLayer";
+export { ChoroplethSvgLayer, ChoroplethLayer } from "./svg/choroplethSvgLayer";
 
 // Canvas-based layers
 export { CircleCanvasLayer } from "./canvas/circleCanvasLayer";

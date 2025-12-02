@@ -10,7 +10,7 @@ jest.mock('ol/proj.js', () => ({
   toLonLat: jest.fn(() => [0, 0]),
 }));
 
-import { ChoroplethLayer } from '../../../src/layers/choroplethLayer';
+import { ChoroplethSvgLayer } from '../../../src/layers/svg/choroplethSvgLayer';
 import type { ChoroplethLayerOptions, GeoJSON } from '../../../src/types';
 import { DomIds } from '../../../src/constants/strings';
 
@@ -69,10 +69,10 @@ function frameState(resolution = 4000): any {
   };
 }
 
-describe('ChoroplethLayer render basics', () => {
+describe('ChoroplethSvgLayer render basics', () => {
   it('constructs value lookup and spatial index', () => {
     const opts = makeOptions();
-    const layer = new ChoroplethLayer(opts);
+    const layer = new ChoroplethSvgLayer(opts);
     expect(layer.valueLookup).toEqual({ A: 1, B: 2 });
     // spatial index should exist with two items loaded
     const index = (layer as any).spatialIndex;
@@ -82,7 +82,7 @@ describe('ChoroplethLayer render basics', () => {
 
   it('render creates choropleth group with path elements', () => {
     const opts = makeOptions();
-    const layer = new ChoroplethLayer(opts);
+    const layer = new ChoroplethSvgLayer(opts);
     const fs = frameState();
     const result = layer.render(fs);
     expect(result).toBe(opts.svgContainer);
@@ -97,7 +97,7 @@ describe('ChoroplethLayer render basics', () => {
 
   it('setActive(false) prevents render output', () => {
     const opts = makeOptions();
-    const layer = new ChoroplethLayer(opts);
+    const layer = new ChoroplethSvgLayer(opts);
     layer.setActive(false);
     const fs = frameState();
     layer.render(fs);
