@@ -124,13 +124,22 @@ export class OptionsService {
      * @param model - The Power BI formatting settings model
      * @returns Typed ChoroplethOptions for ChoroplethOrchestrator consumption
      */
-    static getChoroplethOptions(model: RoseaMapVizFormattingSettingsModel): ChoroplethOptions {
+    static getChoroplethOptions(
+        model: RoseaMapVizFormattingSettingsModel,
+        overrides?: { mapboxAccessToken?: string }
+    ): ChoroplethOptions {
         const choroplethSettings = model.ChoroplethVisualCardSettings;
-        const choroplethDisplaySettings = choroplethSettings.choroplethDisplaySettingsGroup;
         const choroplethLocationSettings = choroplethSettings.choroplethLocationBoundarySettingsGroup;
         const choroplethClassificationSettings = choroplethSettings.choroplethClassificationSettingsGroup;
         const choroplethLegendSettings = choroplethSettings.choroplethLegendSettingsGroup;
         const nestedGeometrySettings = choroplethSettings.choroplethNestedGeometrySettingsGroup;
+        
+        // Mapbox access token: prefer data role override, then fall back to basemap settings
+        const basemapSettings = model.BasemapVisualCardSettings;
+        const mapboxAccessToken = this.preferCredential(
+            overrides?.mapboxAccessToken,
+            basemapSettings.mapBoxSettingsGroup.mapboxAccessToken.value
+        );
 
         return {
             layerControl: choroplethSettings.topLevelSlice.value,
@@ -141,21 +150,39 @@ export class OptionsService {
             geoBoundariesAdminLevel: choroplethLocationSettings.geoBoundariesAdminLevel.value.value.toString(),
             sourceFieldID: choroplethLocationSettings.boundaryDataSource.value.value === "custom"
                 ? choroplethLocationSettings.customBoundaryIdField.value
-                : choroplethLocationSettings.boundaryIdField.value.value.toString(),
+                : choroplethLocationSettings.boundaryDataSource.value.value === "mapbox"
+                    ? choroplethLocationSettings.mapboxTilesetIdField.value
+                    : choroplethLocationSettings.boundaryIdField.value.value.toString(),
             locationPcodeNameId: choroplethLocationSettings.boundaryDataSource.value.value === "custom"
                 ? choroplethLocationSettings.customBoundaryIdField.value
-                : choroplethLocationSettings.boundaryIdField.value.value.toString(),
+                : choroplethLocationSettings.boundaryDataSource.value.value === "mapbox"
+                    ? choroplethLocationSettings.mapboxTilesetIdField.value
+                    : choroplethLocationSettings.boundaryIdField.value.value.toString(),
             topoJSON_geoJSON_FileUrl: choroplethLocationSettings.topoJSON_geoJSON_FileUrl.value,
-            invertColorRamp: choroplethDisplaySettings.invertColorRamp.value,
-            colorMode: choroplethDisplaySettings.colorMode.value.value.toString(),
-            colorRamp: choroplethDisplaySettings.colorRamp.value.value.toString(),
-            customColorRamp: choroplethDisplaySettings.customColorRamp.value,
+            // Mapbox Tileset settings
+            mapboxTilesetId: choroplethLocationSettings.mapboxTilesetId.value,
+            mapboxTilesetSourceLayer: choroplethLocationSettings.mapboxTilesetSourceLayer.value,
+            mapboxTilesetIdField: choroplethLocationSettings.mapboxTilesetIdField.value,
+            // Mapbox access token: prefer data role, fall back to basemap settings
+            mapboxAccessToken,
+            // Display settings now in classification group
+            invertColorRamp: choroplethClassificationSettings.invertColorRamp.value,
+            colorMode: choroplethClassificationSettings.colorMode.value.value.toString(),
+            colorRamp: choroplethClassificationSettings.colorRamp.value.value.toString(),
+            customColorRamp: choroplethClassificationSettings.customColorRamp.value,
             classes: choroplethClassificationSettings.numClasses.value,
             classificationMethod: choroplethClassificationSettings.classificationMethod.value.value as import("../types").ClassificationMethod,
-            strokeColor: choroplethDisplaySettings.strokeColor.value.value,
-            strokeWidth: choroplethDisplaySettings.strokeWidth.value,
-            layerOpacity: choroplethDisplaySettings.layerOpacity.value / 100,
-            simplificationStrength: choroplethDisplaySettings.simplificationStrength.value,
+            // Category colors for unique classification
+            categoryColors: choroplethClassificationSettings.getCategoryColors(),
+            categoryValues: choroplethClassificationSettings.getEffectiveCategoryValues(),
+            othersColor: choroplethClassificationSettings.getOthersColor(),
+            strokeColor: choroplethClassificationSettings.strokeColor.value.value,
+            strokeWidth: choroplethClassificationSettings.strokeWidth.value,
+            layerOpacity: choroplethClassificationSettings.layerOpacity.value / 100,
+            simplificationStrength: choroplethClassificationSettings.simplificationStrength.value,
+            // Feature color property support
+            useFeatureColor: choroplethClassificationSettings.useFeatureColor.value,
+            featureColorProperty: choroplethClassificationSettings.featureColorProperty.value || 'color',
             // Nested geometry styling
             showNestedPoints: nestedGeometrySettings.showNestedPoints.value,
             nestedPointRadius: nestedGeometrySettings.nestedPointRadius.value,

@@ -7,7 +7,7 @@ import { OptionsService } from '../../../src/services/OptionsService';
 describe('Settings -> choropleth invertColorRamp propagation', () => {
   it('propagates invertColorRamp true', () => {
     const model = new RoseaMapVizFormattingSettingsModel();
-    const group: any = model.ChoroplethVisualCardSettings.choroplethDisplaySettingsGroup;
+    const group: any = model.ChoroplethVisualCardSettings.choroplethClassificationSettingsGroup;
     group.invertColorRamp.value = true;
     const opts = OptionsService.getChoroplethOptions(model);
     expect(opts.invertColorRamp).toBe(true);

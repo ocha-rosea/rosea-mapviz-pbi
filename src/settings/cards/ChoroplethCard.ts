@@ -8,14 +8,13 @@ import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 import {
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
-    ChoroplethDisplaySettingsGroup,
     ChoroplethLegendSettingsGroup,
     ChoroplethNestedGeometrySettingsGroup
 } from "../groups";
 
 /**
  * Composite card for choropleth map configuration in the formatting pane.
- * Contains boundary source, classification, display styling, legend, and nested geometry settings.
+ * Contains boundary source, classification & display, legend, and nested geometry settings.
  */
 export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCard {
     showLayerControl: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
@@ -25,7 +24,6 @@ export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCa
 
     public choroplethLocationBoundarySettingsGroup = new ChoroplethLocationBoundarySettingsGroup();
     public choroplethClassificationSettingsGroup = new ChoroplethClassificationSettingsGroup();
-    public choroplethDisplaySettingsGroup = new ChoroplethDisplaySettingsGroup();
     public choroplethLegendSettingsGroup = new ChoroplethLegendSettingsGroup();
     public choroplethNestedGeometrySettingsGroup = new ChoroplethNestedGeometrySettingsGroup();
 
@@ -35,7 +33,6 @@ export class ChoroplethVisualCardSettings extends formattingSettings.CompositeCa
     groups: formattingSettings.Group[] = [
         this.choroplethLocationBoundarySettingsGroup,
         this.choroplethClassificationSettingsGroup,
-        this.choroplethDisplaySettingsGroup,
         this.choroplethLegendSettingsGroup,
         this.choroplethNestedGeometrySettingsGroup
     ];

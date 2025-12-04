@@ -71,7 +71,6 @@ export {
     // Choropleth groups
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
-    ChoroplethDisplaySettingsGroup,
     ChoroplethLegendSettingsGroup,
     // Controls groups
     MapToolsSettingsGroup,

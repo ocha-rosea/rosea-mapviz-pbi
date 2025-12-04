@@ -6,6 +6,7 @@ import { ColorRampManager } from "./ColorRampManager";
 import { ClassificationMethods } from "../constants/strings";
 import { RoleNames } from "../constants/roles";
 import { ChoroplethOptions } from "../types/index";
+import { rewindFeatureCollection } from "../utils/geometry";
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
@@ -285,9 +286,26 @@ export class ChoroplethDataService {
     public getClassBreaks(values: any[], options: any): any[] {
 
     if (options.classificationMethod === ClassificationMethods.Unique) {
-            // Unique value (categorical) classification for numbers
-            // Sort numerically and cap to 7 unique values
-            const unique = Array.from(new Set(values)).sort((a, b) => a - b);
+            // Unique value (categorical) classification
+            const unique = Array.from(new Set(values));
+            
+            // Sort: numbers ascending, strings alphabetically
+            unique.sort((a, b) => {
+                const aNum = typeof a === 'number' || !isNaN(Number(a));
+                const bNum = typeof b === 'number' || !isNaN(Number(b));
+                
+                if (aNum && bNum) {
+                    // Both numeric: sort ascending
+                    return Number(a) - Number(b);
+                } else if (!aNum && !bNum) {
+                    // Both strings: sort alphabetically
+                    return String(a).localeCompare(String(b));
+                } else {
+                    // Mixed: numbers first
+                    return aNum ? -1 : 1;
+                }
+            });
+            
             const n = Math.min(options.classes || 7, 7);
             return unique.slice(0, n);
         }
@@ -329,7 +347,7 @@ export class ChoroplethDataService {
      */
     public getColorScale(classBreaks: any[], options: ChoroplethOptions): string[] {
 
-        // For unique values, ensure color ramp aligns with requested class count (max 7)
+        // For unique values, use user-defined category colors if available
         if (options.classificationMethod === ClassificationMethods.Unique) {
             const classesRequested = typeof options.classes === "number" && options.classes > 0 ? options.classes : classBreaks.length;
             const maxClasses = Math.min(Math.max(classesRequested, 0), 7);
@@ -338,6 +356,18 @@ export class ChoroplethDataService {
                 return [];
             }
 
+            // Use user-defined category colors if provided
+            if (options.categoryColors && Array.isArray(options.categoryColors) && options.categoryColors.length > 0) {
+                // Return the user-defined colors, limited to maxClasses
+                const colors = options.categoryColors.slice(0, maxClasses);
+                // Pad with othersColor if needed (shouldn't normally happen)
+                while (colors.length < maxClasses) {
+                    colors.push(options.othersColor || "#999999");
+                }
+                return colors;
+            }
+
+            // Fallback to color ramp if no category colors defined
             const baseRamp = this.colorRampService.getColorRamp();
             const ramp = options.invertColorRamp === true ? baseRamp.slice().reverse() : baseRamp.slice();
             const usingCustomRamp = (options.colorRamp || "").toLowerCase() === "custom";
@@ -384,14 +414,20 @@ export class ChoroplethDataService {
      * @param value The value to get the color for (can be string or number)
      * @param classBreaks The class breaks or unique values
      * @param colorScale The color scale to use for the color
-     * @param options Choropleth options (to check classification method)
+     * @param classificationMethod Classification method being used
+     * @param othersColor Color for values not in the top 7 categories
+     * @param categoryValues User-defined category values for mapping (optional)
+     * @param categoryColors Fixed colors aligned with categoryValues (optional, for unique classification)
      * @returns The color from the color scale
      */
     public getColorFromClassBreaks(
         value: any,
         classBreaks: any[],
         colorScale: string[],
-        classificationMethod: string
+        classificationMethod: string,
+        othersColor?: string,
+        categoryValues?: string[],
+        categoryColors?: string[]
     ): string {
 
         const isNoDataValue = (candidate: any): boolean => {
@@ -409,14 +445,39 @@ export class ChoroplethDataService {
             return "rgba(0,0,0,0)";
         }
 
-    if (classificationMethod === ClassificationMethods.Unique) {
-            // Unique value (categorical): only top 7 get mapped, others get black
-            const index = classBreaks.indexOf(value);
-            // Only allow mapping for index 0-6 (top 7), all others get black
-            if (index >= 0 && index < 7) {
-                return colorScale[index];
+        if (classificationMethod === ClassificationMethods.Unique) {
+            // Normalize value to string for comparison
+            const valueStr = String(value).trim();
+            
+            // For unique classification, prefer categoryColors (fixed per slot) over colorScale (may be filtered)
+            // categoryColors is always aligned with categoryValues by index
+            const effectiveColors = (categoryColors && categoryColors.length >= 7) ? categoryColors : colorScale;
+            
+            // If user has defined category values, use them for mapping
+            if (categoryValues && Array.isArray(categoryValues)) {
+                // Find matching category value
+                for (let i = 0; i < Math.min(categoryValues.length, 7); i++) {
+                    const catValue = categoryValues[i]?.trim();
+                    if (catValue && catValue.length > 0 && catValue === valueStr) {
+                        return effectiveColors[i] || othersColor || "#999999";
+                    }
+                }
             }
-            return "#000000";
+            
+            // Fall back to class breaks matching
+            // Try string comparison first
+            const stringIndex = classBreaks.findIndex(b => String(b).trim() === valueStr);
+            if (stringIndex >= 0 && stringIndex < 7) {
+                return effectiveColors[stringIndex] || othersColor || "#999999";
+            }
+            
+            // Try direct comparison for numbers
+            const directIndex = classBreaks.indexOf(value);
+            if (directIndex >= 0 && directIndex < 7) {
+                return effectiveColors[directIndex] || othersColor || "#999999";
+            }
+            
+            return othersColor || "#999999";
         }
 
         // Numeric classification
@@ -506,12 +567,19 @@ export class ChoroplethDataService {
         }
 
         const geo = topojson.feature(topology, (topology.objects as any)[selectedLayerName]) as any;
+        
+        // Rewind polygon coordinates to comply with RFC 7946 GeoJSON spec.
+        // This fixes polygons where the exterior ring is wound clockwise (which causes
+        // them to "fill the world" by inverting the inside/outside interpretation).
+        // TopoJSON doesn't guarantee winding order, so we normalize it here.
+        
         // Ensure a FeatureCollection is returned
         if (geo && geo.type === "FeatureCollection") {
-            return geo as FeatureCollection;
+            return rewindFeatureCollection(geo) as FeatureCollection;
         }
         if (geo && geo.type === "Feature") {
-            return { type: "FeatureCollection", features: [geo] } as FeatureCollection;
+            const fc = { type: "FeatureCollection", features: [geo] } as any;
+            return rewindFeatureCollection(fc) as FeatureCollection;
         }
         // Fallback: wrap empty collection if unexpected
         return { type: "FeatureCollection", features: [] } as FeatureCollection;

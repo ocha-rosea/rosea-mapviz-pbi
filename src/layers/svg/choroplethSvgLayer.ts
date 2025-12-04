@@ -3,6 +3,7 @@ import { fromLonLat } from 'ol/proj.js';
 import { State } from 'ol/source/Source';
 import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../../types/index';
 import { geoBounds, geoPath, geoMercator } from 'd3-geo';
+import { getFeatureColor } from '../../utils/color';
 import { Extent } from 'ol/extent.js';
 import { FrameState } from 'ol/Map';
 import { DomIds } from "../../constants/strings";
@@ -154,10 +155,19 @@ export class ChoroplethSvgLayer extends Layer {
                 strokeColor = this.options.highContrastColors.background;
                 strokeWidth = Math.max(2, this.options.strokeWidth); // Minimum 2px stroke in HC mode
             } else {
-                // Normal mode: use configured color scale
-                fillColor = (pCode === undefined || isNoDataValue(valueRaw))
-                    ? NO_DATA_COLOR
-                    : this.options.colorScale(valueRaw);
+                // Normal mode: check for feature color property first, then use color scale
+                // Priority: 1. Feature color property, 2. Color scale, 3. NO_DATA_COLOR
+                const featureColor = this.options.useFeatureColor
+                    ? getFeatureColor(feature.properties, this.options.featureColorProperty)
+                    : null;
+                
+                if (featureColor) {
+                    fillColor = featureColor;
+                } else if (pCode === undefined || isNoDataValue(valueRaw)) {
+                    fillColor = NO_DATA_COLOR;
+                } else {
+                    fillColor = this.options.colorScale(valueRaw);
+                }
                 strokeColor = this.options.strokeColor;
                 strokeWidth = this.options.strokeWidth;
             }

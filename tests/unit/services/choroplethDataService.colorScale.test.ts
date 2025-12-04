@@ -21,12 +21,15 @@ describe('ChoroplethDataService getColorScale / getColorFromClassBreaks', () => 
     expect(colors[6]).toBe('#c7');
   });
 
-  it('getColorFromClassBreaks maps only first 7 uniques and blacks others', () => {
+  it('getColorFromClassBreaks maps only first 7 uniques and uses othersColor for rest', () => {
     const breaks = ['A','B','C','D','E','F','G','H'];
     const colors = svc.getColorScale(breaks, { classificationMethod: ClassificationMethods.Unique, invertColorRamp: false, classes: 8, colorMode: 'lab' } as any);
     expect(svc.getColorFromClassBreaks('A', breaks, colors, ClassificationMethods.Unique)).toBe(colors[0]);
     expect(svc.getColorFromClassBreaks('G', breaks, colors, ClassificationMethods.Unique)).toBe(colors[6]);
-    expect(svc.getColorFromClassBreaks('H', breaks, colors, ClassificationMethods.Unique)).toBe('#000000');
+    // 'H' is beyond top 7, so it gets the default othersColor (#999999)
+    expect(svc.getColorFromClassBreaks('H', breaks, colors, ClassificationMethods.Unique)).toBe('#999999');
+    // Can also pass custom othersColor
+    expect(svc.getColorFromClassBreaks('H', breaks, colors, ClassificationMethods.Unique, '#cccccc')).toBe('#cccccc');
   });
 
   it('warns and pads when custom ramp provides fewer colors than classes', () => {

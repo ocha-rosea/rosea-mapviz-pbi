@@ -5,6 +5,7 @@ import type { Extent } from 'ol/extent.js';
 import { transformExtent } from 'ol/proj.js';
 import type { ChoroplethLayerOptions, GeoJSONFeature } from '../../types';
 import { fromLonLat } from 'ol/proj.js';
+import { getFeatureColor } from '../../utils/color';
 
 const NO_DATA_COLOR = "rgba(0,0,0,0)";
 const isNoDataValue = (value: any): boolean => {
@@ -56,19 +57,38 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
     feats.forEach((f: any) => {
       const pcodeKey = options.dataKey;
       const pCode = f.get(pcodeKey);
-  const v = valueLookup[pCode];
-  const missing = (pCode === undefined) || isNoDataValue(v);
-  const fillStr = missing ? NO_DATA_COLOR : options.colorScale(v as any);
-  const [r,g,b] = toRGB(fillStr);
-  const aBase = missing ? 0 : Math.max(0, Math.min(1, options.fillOpacity));
-  const aDim = missing ? 0 : aBase * 0.2;
-  f.set('fillSelected', [r, g, b, aBase]);
-  f.set('fillDim', [r, g, b, aDim]);
-  const dp = (options.dataPoints || []).find((x: any) => x.pcode === pCode);
-  const selId: any = dp?.selectionId;
-  const selKey = (selId && (selId as any).getKey?.()) || (selId as any)?.key || (selId as any)?.toString?.();
-  f.set('selectionId', dp?.selectionId);
-  f.set('selectionKey', selKey);
+      const v = valueLookup[pCode];
+      const missing = (pCode === undefined) || isNoDataValue(v);
+      
+      // Check for feature-level color override (only if enabled)
+      // Get original properties from the GeoJSON feature
+      const originalFeature = (options.geojson?.features || []).find(
+          (gf: any) => gf.properties?.[pcodeKey] === pCode
+      );
+      const featureColor = options.useFeatureColor
+          ? getFeatureColor(originalFeature?.properties, options.featureColorProperty)
+          : null;
+      
+      // Determine fill color - priority: 1. Feature color, 2. Color scale, 3. NO_DATA_COLOR
+      let fillStr: string;
+      if (featureColor) {
+          fillStr = featureColor;
+      } else if (missing) {
+          fillStr = NO_DATA_COLOR;
+      } else {
+          fillStr = options.colorScale(v as any);
+      }
+      
+      const [r,g,b] = toRGB(fillStr);
+      const aBase = (missing && !featureColor) ? 0 : Math.max(0, Math.min(1, options.fillOpacity));
+      const aDim = (missing && !featureColor) ? 0 : aBase * 0.2;
+      f.set('fillSelected', [r, g, b, aBase]);
+      f.set('fillDim', [r, g, b, aDim]);
+      const dp = (options.dataPoints || []).find((x: any) => x.pcode === pCode);
+      const selId: any = dp?.selectionId;
+      const selKey = (selId && (selId as any).getKey?.()) || (selId as any)?.key || (selId as any)?.toString?.();
+      f.set('selectionId', dp?.selectionId);
+      f.set('selectionKey', selKey);
       f.set('tooltip', dp?.tooltip);
       f.set('selected', 1);
     });
@@ -99,6 +119,10 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
     this.hitLayerEl = hit;
     const features: GeoJSONFeature[] = (this.options.geojson?.features || []) as any;
     const m: any = map || (this as any).getMap?.();
+    
+    // Get point radius from nested geometry settings or use default
+    const pointRadius = this.options.nestedGeometryStyle?.pointRadius ?? 4;
+    
     const buildPath = (f: GeoJSONFeature) => {
       const segs: string[] = [];
       const toPx = (lon: number, lat: number) => {
@@ -142,11 +166,11 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
             }
           }
         } else if (g.type === 'Point') {
-          // Points rendered as small circles - add a small circle path
+          // Points rendered as small circles - use configured radius from settings
           const [lon, lat] = g.coordinates;
           const center = toPx(lon, lat);
-          // Create a small circular path (approximation using 4 bezier curves)
-          const r = 4; // radius in pixels
+          // Create a small circular path using arc commands
+          const r = pointRadius;
           const [cx, cy] = center.split(',').map(Number);
           segs.push(`M${cx-r},${cy}`);
           segs.push(`A${r},${r} 0 1,0 ${cx+r},${cy}`);
@@ -156,7 +180,7 @@ export class ChoroplethWebGLLayer extends WebGLVectorLayer<any> {
           for (const coord of g.coordinates as any[]) {
             const [lon, lat] = coord;
             const center = toPx(lon, lat);
-            const r = 4;
+            const r = pointRadius;
             const [cx, cy] = center.split(',').map(Number);
             segs.push(`M${cx-r},${cy}`);
             segs.push(`A${r},${r} 0 1,0 ${cx+r},${cy}`);

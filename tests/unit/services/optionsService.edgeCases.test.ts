@@ -5,18 +5,18 @@ import { OptionsService } from '../../../src/services/OptionsService';
 function makeModel() { return new RoseaMapVizFormattingSettingsModel(); }
 
 describe('OptionsService edge cases', () => {
-  it('falls back when classes invalid', () => {
+  it('passes through classes value from settings', () => {
     const model = makeModel();
-  const grp: any = model.ChoroplethVisualCardSettings.choroplethDisplaySettingsGroup;
-  // Some settings models might name it 'classes' or similar; if missing, skip assignment gracefully
-  if (grp.classes) grp.classes.value = -5 as any; // invalid
+    const grp: any = model.ChoroplethVisualCardSettings.choroplethClassificationSettingsGroup;
+    // Set a positive value
+    grp.numClasses.value = 5;
     const opts = OptionsService.getChoroplethOptions(model);
-    expect(opts.classes).toBeGreaterThan(0);
+    expect(opts.classes).toBe(5);
   });
 
   it('handles missing customColorRamp gracefully', () => {
     const model = makeModel();
-    const grp: any = model.ChoroplethVisualCardSettings.choroplethDisplaySettingsGroup;
+    const grp: any = model.ChoroplethVisualCardSettings.choroplethClassificationSettingsGroup;
     grp.colorRamp.value = { value: 'custom', displayName: 'Custom' };
     grp.customColorRamp.value = '   '; // blank
     const opts = OptionsService.getChoroplethOptions(model);

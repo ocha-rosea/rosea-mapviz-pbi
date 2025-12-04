@@ -1,813 +1,1129 @@
-# ROSEA MapViz - Choropleth Efficiency Enhancement Plan
+# ROSEA MapViz - Feature Color Property Support
 
 ## Overview
 
-This document outlines efficiency improvements for choropleth mapping while maintaining:
-1. **Full GeoJSON geometry type support** - All types including GeometryCollections
-2. **1-1 Power BI data relationship** - Feature structure preserved exactly
-3. **Consistent cross-engine rendering** - Same simplified data for SVG/Canvas/WebGL
-4. **Evidence-based simplification** - Thresholds based on feature count and data density
+Enable choropleth features to use a color property from the GeoJSON/TopoJSON data for styling, with fallback to visual settings. Ensure all geometry types (Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, GeometryCollection) render correctly across all three render engines (SVG, Canvas, WebGL).
 
 ---
 
-## Core Design Principles
+## Key Concepts: FeatureCollection vs GeometryCollection
 
-### Principle 1: Preserve Feature Structure
-```
-Power BI Row 1  ←→  GeoJSON Feature 1  ←→  Simplified Feature 1
-Power BI Row 2  ←→  GeoJSON Feature 2  ←→  Simplified Feature 2
-Power BI Row N  ←→  GeoJSON Feature N  ←→  Simplified Feature N
+### FeatureCollection (Multiple Features)
 
-✅ GeometryCollections stay as GeometryCollections
-✅ Feature properties remain unchanged
-✅ Feature array indices preserved
-```
+A **FeatureCollection** contains multiple separate features, each with its **own properties object**. Each feature can have a different color.
 
-### Principle 2: Simplify Before Rendering (Orchestrator Level)
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   PROPOSED ARCHITECTURE                                  │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ChoroplethOrchestrator                                                  │
-│       │                                                                  │
-│       ▼                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  GeometrySimplificationService.process(geojson, options)          │   │
-│  │                                                                    │   │
-│  │  1. Detect source type (TopoJSON vs GeoJSON)                      │   │
-│  │  2. If TopoJSON source → SKIP simplification (already optimized)  │   │
-│  │  3. If GeoJSON source → Apply evidence-based simplification       │   │
-│  │  4. Cache result for reuse                                        │   │
-│  │                                                                    │   │
-│  │  Returns: SimplifiedGeoJSON (same structure, fewer vertices)      │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│       │                                                                  │
-│       ▼                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │  SAME simplified data passed to ALL render engines                │   │
-│  │                                                                    │   │
-│  │  ┌──────────┐    ┌──────────┐    ┌──────────┐                    │   │
-│  │  │   SVG    │    │  Canvas  │    │  WebGL   │                    │   │
-│  │  │  Layer   │    │  Layer   │    │  Layer   │                    │   │
-│  │  └──────────┘    └──────────┘    └──────────┘                    │   │
-│  │                                                                    │   │
-│  │  ✅ Consistent visual output                                      │   │
-│  │  ✅ No per-layer simplification logic                            │   │
-│  │  ✅ Simpler layer implementations                                 │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
+```json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "A", "color": "#ff0000" },
+      "geometry": { "type": "Point", "coordinates": [100, 0] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "B", "color": "#00ff00" },
+      "geometry": { "type": "Polygon", "coordinates": [[[100, 0], [101, 0], [101, 1], [100, 1], [100, 0]]] }
+    }
+  ]
+}
 ```
 
-### Principle 3: Evidence-Based Simplification Thresholds
+**Color Behavior:**
+- Feature A (Point) → Uses `#ff0000`
+- Feature B (Polygon) → Uses `#00ff00`
+- Each feature styled independently
 
-Based on Power BI constraints and rendering performance:
+### GeometryCollection (Nested Geometries)
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| **Feature Count** | ≤ 500 | No simplification needed |
-| **Feature Count** | 501 - 2,000 | Light simplification (preserve detail) |
-| **Feature Count** | 2,001 - 10,000 | Moderate simplification |
-| **Feature Count** | > 10,000 | Aggressive simplification |
-| **Total Vertices** | ≤ 50,000 | No simplification needed |
-| **Total Vertices** | 50,001 - 200,000 | Light simplification |
-| **Total Vertices** | 200,001 - 1,000,000 | Moderate simplification |
-| **Total Vertices** | > 1,000,000 | Aggressive simplification |
-| **Avg Feature Area** | Small (< 0.1% viewport) | Less aggressive (preserve shape) |
-| **Avg Feature Area** | Large (> 5% viewport) | More aggressive OK |
+A **GeometryCollection** is a **single feature** with multiple geometries that **share one properties object**. All geometries in the collection get the same base color.
 
-**Power BI Reference Limits:**
-- Maximum rows in visual: 30,000 (standard), 150,000 (with scrolling)
-- Recommended for performance: < 10,000 data points
-- Memory limit per visual: ~100MB
+```json
+{
+  "type": "Feature",
+  "properties": { "id": "C", "color": "#0000ff" },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      { "type": "Point", "coordinates": [102, 0] },
+      { "type": "LineString", "coordinates": [[100, 0], [101, 1]] },
+      { "type": "Polygon", "coordinates": [[[100, 0], [101, 0], [101, 1], [100, 1], [100, 0]]] }
+    ]
+  }
+}
+```
+
+**Color Behavior:**
+- All geometries (Point, Line, Polygon) share `#0000ff` as base color
+- Nested style overrides (from settings) may apply different colors for points/lines within the collection
+
+### Styling Matrix
+
+| Structure | Geometry | Feature Color | Nested Style Override | Final Color |
+|-----------|----------|---------------|----------------------|-------------|
+| FeatureCollection | Point (Feature A) | `#ff0000` | N/A | `#ff0000` |
+| FeatureCollection | Polygon (Feature B) | `#00ff00` | N/A | `#00ff00` |
+| GeometryCollection | Polygon | `#0000ff` | N/A | `#0000ff` (fill) |
+| GeometryCollection | LineString | `#0000ff` | `showLines=true`, `lineColor=#ffff00` | `#ffff00` (override) |
+| GeometryCollection | Point | `#0000ff` | `showPoints=true`, `pointColor=#ff00ff` | `#ff00ff` (override) |
+| Any | Any | (none) | N/A | Color scale value |
 
 ---
 
-## Current Architecture Analysis
+## Requirements
 
-### Current State by Layer
-
-| Layer | File | Simplification | Issue |
-|-------|------|----------------|-------|
-| **SVG** | `choroplethLayer.ts` | ✅ TopoJSON LOD | Applied per-layer, not shared |
-| **Canvas** | `choroplethCanvasLayer.ts` | ❌ None | Raw GeoJSON, no optimization |
-| **WebGL** | `choroplethWebGLLayer.ts` | ❌ None | Raw GeoJSON, no optimization |
-
-### Current Data Flow
-
-```
-ChoroplethOrchestrator
-       │
-       ├─── processGeoData() → Raw GeoJSON
-       │
-       └─── Creates layer with raw data
-               │
-               ├── SVG Layer: Applies its own simplification (TopoJSON)
-               ├── Canvas Layer: Uses raw data (slow for large datasets)
-               └── WebGL Layer: Uses raw data (slow for large datasets)
-               
-⚠️ Problem: Each engine sees different data
-```
+1. **Toggle Setting**: Add a toggle in Display settings to enable/disable feature color property usage
+2. **Color Property Name**: Add a text field to specify the property name (default: "color")
+3. **Color Property Detection**: Check if a feature has the specified color property in its `properties` object
+4. **Color Format Validation**: Support hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`), RGB (`rgb(r,g,b)`), and RGBA (`rgba(r,g,b,a)`) formats
+5. **Fallback Behavior**: If toggle is off or no valid color property exists, use the existing color scale from visual settings
+6. **All Geometry Types**: Ensure Points, Lines, and Polygons all render with correct colors
+7. **Cross-Engine Consistency**: Same behavior in SVG, Canvas, and WebGL layers
+8. **GeometryCollection Handling**: All nested geometries share the parent feature's color property
 
 ---
 
-## Proposed Enhancements
+## Implementation Design
 
-### Enhancement 1: Centralized Pre-Render Simplification
+### 1. Visual Settings
 
-**Goal:** Simplify geometry ONCE at orchestrator level, share with all engines.
-
-**New Service:** `src/services/GeometrySimplificationService.ts`
+Add new settings to `ChoroplethDisplaySettingsGroup` in `src/settings/groups/ChoroplethGroups.ts`:
 
 ```typescript
-export interface SimplificationOptions {
-  /** Source data type - TopoJSON sources skip simplification */
-  sourceType: 'topojson' | 'geojson';
+/**
+ * Toggle to enable using color property from feature properties
+ */
+useFeatureColor: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+    name: "useFeatureColor",
+    displayName: "Use Feature Color",
+    description: "When enabled, uses the color property from GeoJSON/TopoJSON feature properties if available",
+    value: false
+});
+
+/**
+ * Property name to look for color values in feature properties
+ */
+featureColorProperty: formattingSettings.TextInput = new formattingSettings.TextInput({
+    name: "featureColorProperty",
+    displayName: "Color Property Name",
+    description: "The property name in feature properties that contains the color value (e.g., 'color', 'fill', 'style_color')",
+    value: "color",
+    placeholder: "color"
+});
+```
+
+Add to slices array and conditional visibility:
+
+```typescript
+slices: formattingSettings.Slice[] = [
+    // ... existing slices
+    this.useFeatureColor,
+    this.featureColorProperty,
+];
+
+public applyConditionalDisplayRules(): void {
+    // Show color property name only when feature color is enabled
+    this.featureColorProperty.visible = this.useFeatureColor.value === true;
+    // ... other rules
+}
+```
+
+Update `ChoroplethOptions` interface in `src/types/index.ts`:
+
+```typescript
+export interface ChoroplethOptions {
+    // ... existing properties
+    
+    /** Whether to use color property from feature properties */
+    useFeatureColor: boolean;
+    
+    /** Property name to look for color values (default: "color") */
+    featureColorProperty: string;
+}
+```
+
+Update `OptionsService.ts` to include new options:
+
+```typescript
+// In getChoroplethOptions()
+return {
+    // ... existing options
+    useFeatureColor: choroplethDisplaySettings.useFeatureColor.value,
+    featureColorProperty: choroplethDisplaySettings.featureColorProperty.value || 'color',
+};
+```
+
+### 2. Color Utility Functions
+
+Create `src/utils/color.ts`:
+
+```typescript
+/**
+ * Validates if a string is a valid CSS color value.
+ * Supports: #RGB, #RRGGBB, #RRGGBBAA, rgb(), rgba()
+ */
+export function isValidCssColor(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const s = value.trim();
   
-  /** User-configured simplification strength (0-100, from settings) */
-  strength: number;
+  // Hex: #RGB, #RRGGBB, #RRGGBBAA
+  if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(s)) {
+    return true;
+  }
   
-  /** Enable auto-detection of optimal simplification */
-  autoDetect: boolean;
+  // RGB: rgb(0-255, 0-255, 0-255)
+  if (/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(s)) {
+    return true;
+  }
+  
+  // RGBA: rgba(0-255, 0-255, 0-255, 0-1)
+  if (/^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*[\d.]+\s*\)$/i.test(s)) {
+    return true;
+  }
+  
+  return false;
 }
 
-export interface SimplificationMetrics {
-  featureCount: number;
-  totalVertices: number;
-  avgVerticesPerFeature: number;
-  boundingBox: [number, number, number, number];
-  geometryTypes: Set<string>;
-}
-
-export interface SimplificationResult {
-  /** Simplified GeoJSON (same structure as input) */
-  geojson: FeatureCollection;
+/**
+ * Extracts a valid color from feature properties using the specified property name.
+ * @param properties - Feature properties object
+ * @param propertyName - The property name to look for (default: "color")
+ * @returns Valid CSS color string or null
+ */
+export function getFeatureColor(
+  properties: Record<string, unknown> | null,
+  propertyName: string = 'color'
+): string | null {
+  if (!properties || !propertyName) return null;
   
-  /** Metrics about the simplification */
-  metrics: SimplificationMetrics;
+  // Try exact property name first
+  let colorValue = properties[propertyName];
   
-  /** Whether simplification was applied */
-  wasSimplified: boolean;
-  
-  /** Simplification level used */
-  level: 'none' | 'light' | 'moderate' | 'aggressive';
-}
-
-export class GeometrySimplificationService {
-  
-  /**
-   * Main entry point - analyzes data and applies appropriate simplification.
-   * Maintains 1-1 feature relationship with source data.
-   */
-  static process(
-    geojson: FeatureCollection,
-    options: SimplificationOptions
-  ): SimplificationResult {
-    
-    // 1. If source is TopoJSON, skip (already optimized)
-    if (options.sourceType === 'topojson') {
-      return {
-        geojson,
-        metrics: this.computeMetrics(geojson),
-        wasSimplified: false,
-        level: 'none'
-      };
-    }
-    
-    // 2. Compute metrics to determine simplification need
-    const metrics = this.computeMetrics(geojson);
-    
-    // 3. Determine simplification level based on evidence
-    const level = this.determineLevel(metrics, options);
-    
-    // 4. If no simplification needed, return as-is
-    if (level === 'none') {
-      return { geojson, metrics, wasSimplified: false, level };
-    }
-    
-    // 5. Apply simplification while preserving structure
-    const simplified = this.simplifyPreservingStructure(geojson, level);
-    
-    return {
-      geojson: simplified,
-      metrics: this.computeMetrics(simplified),
-      wasSimplified: true,
-      level
-    };
-  }
-  
-  /**
-   * Computes metrics about the dataset for threshold decisions.
-   */
-  static computeMetrics(geojson: FeatureCollection): SimplificationMetrics {
-    let totalVertices = 0;
-    const geometryTypes = new Set<string>();
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    for (const feature of geojson.features) {
-      const count = this.countVertices(feature.geometry);
-      totalVertices += count;
-      this.collectGeometryTypes(feature.geometry, geometryTypes);
-      this.expandBbox(feature.geometry, { minX, minY, maxX, maxY });
-    }
-    
-    return {
-      featureCount: geojson.features.length,
-      totalVertices,
-      avgVerticesPerFeature: totalVertices / Math.max(1, geojson.features.length),
-      boundingBox: [minX, minY, maxX, maxY],
-      geometryTypes
-    };
-  }
-  
-  /**
-   * Determines simplification level based on metrics and thresholds.
-   */
-  static determineLevel(
-    metrics: SimplificationMetrics,
-    options: SimplificationOptions
-  ): 'none' | 'light' | 'moderate' | 'aggressive' {
-    
-    // User disabled simplification
-    if (options.strength === 0) return 'none';
-    
-    // Evidence-based thresholds
-    const { featureCount, totalVertices, avgVerticesPerFeature } = metrics;
-    
-    // Small datasets don't need simplification
-    if (featureCount <= 500 && totalVertices <= 50000) {
-      return 'none';
-    }
-    
-    // Very large datasets need aggressive simplification
-    if (featureCount > 10000 || totalVertices > 1000000) {
-      return 'aggressive';
-    }
-    
-    // Medium datasets - moderate
-    if (featureCount > 2000 || totalVertices > 200000) {
-      return 'moderate';
-    }
-    
-    // Smallish but complex - light
-    if (avgVerticesPerFeature > 100 || totalVertices > 50000) {
-      return 'light';
-    }
-    
-    return 'none';
-  }
-  
-  /**
-   * Applies simplification while maintaining exact feature structure.
-   * Each input feature maps to exactly one output feature.
-   */
-  static simplifyPreservingStructure(
-    geojson: FeatureCollection,
-    level: 'light' | 'moderate' | 'aggressive'
-  ): FeatureCollection {
-    
-    // Tolerance values based on level (in degrees, ~111km per degree at equator)
-    const tolerances = {
-      light: 0.0001,     // ~11 meters
-      moderate: 0.001,   // ~111 meters  
-      aggressive: 0.01   // ~1.1 km
-    };
-    
-    const tolerance = tolerances[level];
-    
-    return {
-      type: 'FeatureCollection',
-      features: geojson.features.map(feature => ({
-        ...feature,
-        geometry: this.simplifyGeometry(feature.geometry, tolerance)
-      }))
-    };
-  }
-  
-  /**
-   * Recursively simplifies a geometry, handling all types including GeometryCollections.
-   * Points are never simplified. Lines and Polygons use Douglas-Peucker.
-   */
-  static simplifyGeometry(geometry: Geometry, tolerance: number): Geometry {
-    if (!geometry) return geometry;
-    
-    switch (geometry.type) {
-      case 'Point':
-      case 'MultiPoint':
-        // Points cannot be simplified - return as-is
-        return geometry;
-        
-      case 'LineString':
-        return {
-          type: 'LineString',
-          coordinates: this.douglasPeucker(geometry.coordinates, tolerance)
-        };
-        
-      case 'MultiLineString':
-        return {
-          type: 'MultiLineString',
-          coordinates: geometry.coordinates.map(line => 
-            this.douglasPeucker(line, tolerance)
-          )
-        };
-        
-      case 'Polygon':
-        return {
-          type: 'Polygon',
-          coordinates: geometry.coordinates.map(ring =>
-            this.simplifyRing(ring, tolerance)
-          )
-        };
-        
-      case 'MultiPolygon':
-        return {
-          type: 'MultiPolygon',
-          coordinates: geometry.coordinates.map(polygon =>
-            polygon.map(ring => this.simplifyRing(ring, tolerance))
-          )
-        };
-        
-      case 'GeometryCollection':
-        // Recursively simplify each geometry in the collection
-        return {
-          type: 'GeometryCollection',
-          geometries: geometry.geometries.map(g => 
-            this.simplifyGeometry(g, tolerance)
-          )
-        };
-        
-      default:
-        return geometry;
-    }
-  }
-  
-  /**
-   * Douglas-Peucker line simplification algorithm.
-   */
-  static douglasPeucker(coords: number[][], tolerance: number): number[][] {
-    if (coords.length <= 2) return coords;
-    
-    // Find the point with maximum distance from the line
-    let maxDist = 0;
-    let maxIdx = 0;
-    const first = coords[0];
-    const last = coords[coords.length - 1];
-    
-    for (let i = 1; i < coords.length - 1; i++) {
-      const dist = this.perpendicularDistance(coords[i], first, last);
-      if (dist > maxDist) {
-        maxDist = dist;
-        maxIdx = i;
+  // Fallback: try case-insensitive match
+  if (colorValue === undefined) {
+    const lowerName = propertyName.toLowerCase();
+    for (const key of Object.keys(properties)) {
+      if (key.toLowerCase() === lowerName) {
+        colorValue = properties[key];
+        break;
       }
     }
-    
-    // If max distance exceeds tolerance, recursively simplify
-    if (maxDist > tolerance) {
-      const left = this.douglasPeucker(coords.slice(0, maxIdx + 1), tolerance);
-      const right = this.douglasPeucker(coords.slice(maxIdx), tolerance);
-      return [...left.slice(0, -1), ...right];
-    }
-    
-    // Otherwise, return just the endpoints
-    return [first, last];
   }
   
-  /**
-   * Simplifies a polygon ring, ensuring it remains valid (minimum 4 points for closed ring).
-   */
-  static simplifyRing(ring: number[][], tolerance: number): number[][] {
-    const simplified = this.douglasPeucker(ring, tolerance);
-    
-    // Ensure ring has at least 4 points (3 + closing point)
-    if (simplified.length < 4) {
-      // Keep original if too simplified
-      return ring;
-    }
-    
-    // Ensure ring is closed
-    const first = simplified[0];
-    const last = simplified[simplified.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-      simplified.push([...first]);
-    }
-    
-    return simplified;
+  if (isValidCssColor(colorValue)) {
+    return (colorValue as string).trim();
   }
   
-  /**
-   * Calculates perpendicular distance from point to line.
-   */
-  static perpendicularDistance(
-    point: number[],
-    lineStart: number[],
-    lineEnd: number[]
-  ): number {
-    const dx = lineEnd[0] - lineStart[0];
-    const dy = lineEnd[1] - lineStart[1];
-    
-    if (dx === 0 && dy === 0) {
-      return Math.sqrt(
-        Math.pow(point[0] - lineStart[0], 2) +
-        Math.pow(point[1] - lineStart[1], 2)
-      );
-    }
-    
-    const t = ((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) /
-              (dx * dx + dy * dy);
-    
-    const nearestX = lineStart[0] + t * dx;
-    const nearestY = lineStart[1] + t * dy;
-    
-    return Math.sqrt(
-      Math.pow(point[0] - nearestX, 2) +
-      Math.pow(point[1] - nearestY, 2)
-    );
-  }
-  
-  // Helper methods for counting vertices and collecting types
-  static countVertices(geometry: any): number { /* ... */ }
-  static collectGeometryTypes(geometry: any, types: Set<string>): void { /* ... */ }
-  static expandBbox(geometry: any, bbox: any): void { /* ... */ }
+  return null;
 }
 ```
 
----
+### 3. SVG Layer Modifications
 
-### Enhancement 2: Skip TopoJSON Source Simplification
-
-**Rationale:** TopoJSON files from GeoBoundaries and similar sources are already optimized. Re-simplifying them:
-
-- Wastes computation
-- May degrade carefully tuned boundaries
-- Could break shared arc topology
-
-**Implementation:**
+Update `src/layers/svg/choroplethSvgLayer.ts`:
 
 ```typescript
-// In ChoroplethOrchestrator or ChoroplethDataService
+import { getFeatureColor } from '../../utils/color';
 
-// Track source type when loading data
-private sourceType: 'topojson' | 'geojson' = 'geojson';
+// In render method, for each feature:
+// Only check feature color if enabled in options
+const featureColor = this.options.useFeatureColor 
+  ? getFeatureColor(feature.properties, this.options.featureColorProperty)
+  : null;
 
-async loadBoundaryData(url: string): Promise<FeatureCollection> {
-  const response = await fetch(url);
-  const data = await response.json();
+// Determine fill color with priority:
+// 1. Feature's color property (if enabled and valid)
+// 2. Color scale based on data value (existing logic)
+// 3. NO_DATA_COLOR for missing values
+let fillColor: string;
+if (featureColor) {
+  fillColor = featureColor;
+} else if (pCode === undefined || isNoDataValue(valueRaw)) {
+  fillColor = NO_DATA_COLOR;
+} else {
+  fillColor = this.options.colorScale(valueRaw);
+}
+
+// Apply to ALL geometry types from extractGeometries():
+// - Polygons: fill with fillColor
+// - Lines: stroke with nestedStyle.lineColor (NOT feature color)
+// - Points: fill with nestedStyle.pointColor (NOT feature color)
+//
+// Note: GeometryCollection nested geometries share the parent feature's properties,
+// so featureColor is determined once per feature, then applied consistently.
+```
+
+### 4. Canvas Layer Modifications
+
+Update `src/layers/canvas/choroplethCanvasLayer.ts`:
+
+```typescript
+import { getFeatureColor } from '../../utils/color';
+
+// In render loop:
+for (const feature of this.geojson.features as GeoJSONFeature[]) {
+  const pCode = feature.properties[this.options.dataKey];
+  const value = this.valueLookup[pCode];
   
-  if (data.type === 'Topology') {
-    // Source is TopoJSON - mark it
-    this.sourceType = 'topojson';
-    // Convert to GeoJSON for rendering
-    return topojsonClient.feature(data, data.objects[objectName]);
+  // Check for feature-level color override (only if enabled)
+  // This color applies to ALL geometries in this feature (including GeometryCollection)
+  const featureColor = this.options.useFeatureColor
+    ? getFeatureColor(feature.properties, this.options.featureColorProperty)
+    : null;
+  
+  // Determine fill color - shared by all geometries in this feature
+  const fill = featureColor 
+    ?? ((pCode === undefined || isNoDataValue(value)) ? NO_DATA_COLOR : this.options.colorScale(value));
+  
+  // drawFeature handles all geometry types including GeometryCollections
+  // collectGeometries() recursively extracts all nested geometries
+  // All share the same fill color from the parent feature's properties
+  drawFeature(ctx, feature, project, fill, strokeColor, strokeWidth, opacity, nestedStyle);
+}
+```
+
+### 5. WebGL Layer Modifications
+
+Update `src/layers/webgl/choroplethWebGLLayer.ts`:
+
+```typescript
+import { getFeatureColor } from '../../utils/color';
+
+// In constructor, when building OL features:
+for (const f of (options.geojson.features as GeoJSONFeature[])) {
+  const pCode = f.properties?.[options.dataKey];
+  const dp = (options.dataPoints || []).find((x: any) => x.pcode === pCode);
+  
+  // Check for feature-level color override (only if enabled)
+  const featureColor = options.useFeatureColor
+    ? getFeatureColor(f.properties, options.featureColorProperty)
+    : null;
+  
+  // Determine fill color
+  let fill: string;
+  if (featureColor) {
+    fill = featureColor;
+  } else if (pCode === undefined || isNoDataValue(dp?.value)) {
+    fill = NO_DATA_COLOR;
   } else {
-    // Source is GeoJSON
-    this.sourceType = 'geojson';
-    return data;
-  }
-}
-
-// When building layer options
-const simplificationResult = GeometrySimplificationService.process(
-  geojson,
-  {
-    sourceType: this.sourceType,  // TopoJSON sources skip simplification
-    strength: choroplethOptions.simplificationStrength,
-    autoDetect: true
-  }
-);
-```
-
----
-
-### Enhancement 3: Adaptive Feature-Size Simplification
-
-**Goal:** Smaller features need less aggressive simplification to remain visible.
-
-**Implementation:**
-
-```typescript
-static determineFeatureTolerance(
-  feature: Feature,
-  baseLevel: 'light' | 'moderate' | 'aggressive',
-  viewportBbox: [number, number, number, number]
-): number {
-  const baseTolerance = {
-    light: 0.0001,
-    moderate: 0.001,
-    aggressive: 0.01
-  }[baseLevel];
-  
-  // Calculate feature's bounding box area
-  const featureBbox = turf.bbox(feature);
-  const featureArea = (featureBbox[2] - featureBbox[0]) * (featureBbox[3] - featureBbox[1]);
-  
-  // Calculate viewport area
-  const viewportArea = (viewportBbox[2] - viewportBbox[0]) * (viewportBbox[3] - viewportBbox[1]);
-  
-  // Feature's relative size
-  const relativeSize = featureArea / viewportArea;
-  
-  // Smaller features get reduced tolerance (less simplification)
-  if (relativeSize < 0.001) {
-    return baseTolerance * 0.1;  // Very small: 10% of base tolerance
-  } else if (relativeSize < 0.01) {
-    return baseTolerance * 0.5;  // Small: 50% of base tolerance
-  } else if (relativeSize < 0.1) {
-    return baseTolerance * 0.8;  // Medium: 80% of base tolerance
+    fill = options.colorScale(dp?.value);
   }
   
-  return baseTolerance;  // Large: full tolerance
+  // OL GeoJSON reader handles GeometryCollections - all geometries share same properties
+  const feat = reader.readFeature(f, { featureProjection: 'EPSG:3857' });
+  feat.set('fillSelected', fill);
+  feat.set('fillDim', dimColor(fill));
+  // ... rest of feature setup
 }
 ```
 
 ---
 
-### Enhancement 4: Spatial Indexing Evaluation
+## Color Priority Rules
 
-#### Current State
+### For FeatureCollection (Separate Features)
 
-| Layer | Spatial Index | Usage |
-|-------|---------------|-------|
-| **SVG** | rbush (in Layer) | Tooltip hit testing |
-| **Canvas** | rbush (in Layer) | Tooltip hit testing |
-| **WebGL** | None | OpenLayers handles internally |
+Each feature is styled independently:
 
-#### Analysis: Is Spatial Indexing Worth It?
+```
+Priority 1: feature.properties[colorPropertyName] (if valid hex/rgb/rgba)
+Priority 2: Visual settings color scale (based on measure value)
+Priority 3: NO_DATA_COLOR (transparent) for unmatched/null values
+```
 
-**Benefits:**
+### For GeometryCollection (Nested Geometries)
 
-1. **Fast hit testing** - O(log n) instead of O(n) for tooltip/selection lookups
-2. **Viewport culling** - Only render visible features
+All geometries share the parent feature's color:
 
-**Costs:**
+```
+Base Color: feature.properties[colorPropertyName] OR color scale OR NO_DATA_COLOR
 
-1. **Index build time** - O(n log n) for rbush bulk load
-2. **Memory overhead** - Additional data structure
-3. **Complexity** - More code to maintain
+Then for nested geometries:
+- Polygons → Use base color for fill
+- Lines → Use nestedStyle.lineColor (if showLines=true), else not rendered
+- Points → Use nestedStyle.pointColor (if showPoints=true), else not rendered
+```
 
-**Recommendation:**
+### Color Override Diagram
 
-| Scenario | Recommendation |
-|----------|----------------|
-| Feature count < 500 | ❌ Skip indexing (linear scan is fast enough) |
-| Feature count 500-5000 | ✅ Use rbush for hit testing |
-| Feature count > 5000 | ✅ Use rbush + viewport culling |
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ Feature (properties: { color: "#ff0000", pCode: "ABC" })           │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Is useFeatureColor enabled?                                        │
+│       │                                                             │
+│       ├── YES ─► Is properties[colorPropertyName] valid?            │
+│       │              │                                              │
+│       │              ├── YES ─► Use feature color "#ff0000"         │
+│       │              │                                              │
+│       │              └── NO ──► Fall through to color scale         │
+│       │                                                             │
+│       └── NO ──► Use color scale (existing behavior)               │
+│                                                                     │
+│  Final Color Applied To:                                            │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ Polygons: fillColor = finalColor                            │   │
+│  │ Lines:    strokeColor = nestedStyle.lineColor (if shown)    │   │
+│  │ Points:   fillColor = nestedStyle.pointColor (if shown)     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
 
-**Proposed Change:** Move spatial index creation to orchestrator, share single index across all layers (if used):
+---
+
+## Geometry Type Rendering & Visual Layering
+
+### Geometry Type Support Matrix
+
+| Geometry Type | SVG | Canvas | WebGL | Notes |
+|---------------|-----|--------|-------|-------|
+| Point | ✅ Circle | ✅ Arc | ✅ Circle path | Uses nested point settings |
+| MultiPoint | ✅ Multiple circles | ✅ Multiple arcs | ✅ Multiple paths | Uses nested point settings |
+| LineString | ✅ Path stroke | ✅ Stroke | ✅ Stroke style | Uses nested line settings |
+| MultiLineString | ✅ Multiple paths | ✅ Multiple strokes | ✅ Stroke style | Uses nested line settings |
+| Polygon | ✅ Path fill | ✅ Fill | ✅ Fill style | Uses feature/scale color |
+| MultiPolygon | ✅ Multiple paths | ✅ Multiple fills | ✅ Fill style | Uses feature/scale color |
+| GeometryCollection | ✅ Recursive | ✅ Recursive | ✅ Recursive | Shared properties |
+
+### Visual Layering Order (Bottom to Top)
+
+Correct visual layering ensures proper z-order rendering:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       VISUAL LAYERS                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Layer 3 (Top):     Points  ●●●                                 │
+│                     - Always visible above other geometries      │
+│                     - Settings: pointRadius, pointColor          │
+│                                                                  │
+│  Layer 2 (Middle):  Lines   ───                                 │
+│                     - Rendered above polygons, below points      │
+│                     - Settings: lineWidth, lineColor             │
+│                                                                  │
+│  Layer 1 (Base):    Polygons ▢▢▢                                │
+│                     - Base layer (filled areas)                  │
+│                     - Settings: fillColor, strokeWidth           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Engine Implementation Details
+
+| Engine | Layering Method | Status |
+|--------|-----------------|--------|
+| **SVG** | Separate `<g>` groups: `polygonGroup`, `lineGroup`, `pointGroup` | ✅ Correct |
+| **Canvas** | Multi-pass rendering: Pass 1 (polygons) → Pass 2 (lines) → Pass 3 (points) | ✅ Correct |
+| **WebGL** | OpenLayers flat rendering | ⚠️ Needs enhancement |
+
+### Existing Nested Geometry Settings
+
+The following settings **already exist** in `ChoroplethNestedGeometrySettingsGroup`:
+
+| Setting | Type | Range | Default | Description |
+|---------|------|-------|---------|-------------|
+| `showNestedPoints` | Toggle | - | `true` | Show/hide point geometries |
+| `nestedPointRadius` | NumUpDown | 1-20 | `4` | Point radius in pixels |
+| `nestedPointColor` | ColorPicker | - | `#000000` | Point fill color |
+| `nestedPointStrokeColor` | ColorPicker | - | `#ffffff` | Point border color |
+| `nestedPointStrokeWidth` | NumUpDown | 0-5 | `1` | Point border width |
+| `showNestedLines` | Toggle | - | `true` | Show/hide line geometries |
+| `nestedLineColor` | ColorPicker | - | `#333333` | Line stroke color |
+| `nestedLineWidth` | NumUpDown | 1-10 | `2` | Line width in pixels |
+
+### WebGL Layer Enhancement Needed
+
+The WebGL layer currently has **hardcoded point radius** (4px). It needs to read from nested geometry settings:
 
 ```typescript
-// In ChoroplethOrchestrator
-private spatialIndex: RBush<IndexedFeature> | null = null;
+// Current (hardcoded):
+const r = 4; // radius in pixels
 
-private buildSpatialIndexIfNeeded(geojson: FeatureCollection): void {
-  // Only build index for datasets that benefit from it
-  if (geojson.features.length < 500) {
-    this.spatialIndex = null;
-    return;
-  }
-  
-  const items = geojson.features.map((f, i) => {
-    const bbox = this.computeBbox(f);
-    return {
-      minX: bbox[0], minY: bbox[1],
-      maxX: bbox[2], maxY: bbox[3],
-      featureIndex: i
-    };
+// Needed (from settings):
+const r = this.options.nestedPointRadius || 4;
+```
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/utils/color.ts` | **NEW** - Color validation utilities |
+| `src/settings/groups/ChoroplethGroups.ts` | Add `useFeatureColor` toggle and `featureColorProperty` text input |
+| `src/types/index.ts` | Add options to `ChoroplethOptions` interface |
+| `src/services/OptionsService.ts` | Pass new options to choropleth layers |
+| `src/layers/svg/choroplethSvgLayer.ts` | Add feature color detection |
+| `src/layers/canvas/choroplethCanvasLayer.ts` | Add feature color detection |
+| `src/layers/webgl/choroplethWebGLLayer.ts` | Add feature color detection + use nested style settings for point radius |
+
+---
+
+## Testing Plan
+
+```typescript
+describe('Feature Color Property Support', () => {
+  describe('isValidCssColor()', () => {
+    it('should validate hex colors', () => {
+      expect(isValidCssColor('#fff')).toBe(true);
+      expect(isValidCssColor('#ffffff')).toBe(true);
+      expect(isValidCssColor('#ffffffaa')).toBe(true);
+      expect(isValidCssColor('#gggggg')).toBe(false);
+    });
+    
+    it('should validate rgb/rgba colors', () => {
+      expect(isValidCssColor('rgb(255,0,0)')).toBe(true);
+      expect(isValidCssColor('rgba(255,0,0,0.5)')).toBe(true);
+    });
+    
+    it('should reject invalid colors', () => {
+      expect(isValidCssColor('red')).toBe(false); // Named colors not supported
+      expect(isValidCssColor('not-a-color')).toBe(false);
+      expect(isValidCssColor(123)).toBe(false);
+    });
   });
   
-  this.spatialIndex = new RBush();
-  this.spatialIndex.load(items);
-}
-
-// Pass to layer options
-layerOptions.spatialIndex = this.spatialIndex; // May be null
-```
-
----
-
-### Enhancement 5: Remove Per-Layer Simplification from SVG
-
-**Goal:** SVG layer should receive pre-simplified data like Canvas/WebGL.
-
-**Current SVG Layer Issues:**
-
-1. Has its own TopoJSON simplification logic
-2. Creates LOD cache independently
-3. Behaves differently from other engines
-
-**Proposed Change:**
-
-```typescript
-// BEFORE: SVG layer does its own simplification
-export class ChoroplethLayer extends Layer {
-  constructor(options: ChoroplethLayerOptions) {
-    // ... 
-    this.topo = topology({ layer: this.geojson });
-    this.topoPresimplified = presimplify(this.topo);
-    // ...
-  }
-}
-
-// AFTER: SVG layer receives pre-simplified data
-export class ChoroplethLayer extends Layer {
-  constructor(options: ChoroplethLayerOptions) {
-    // ...
-    // Data is already simplified by orchestrator
-    this.geojson = options.geojson;
-    // No TopoJSON conversion needed
-    // ...
-  }
-}
-```
-
-**Migration Path:**
-
-1. Add `skipInternalSimplification` option to ChoroplethLayerOptions
-2. When true, layer uses geojson as-is
-3. Once stable, remove internal simplification code entirely
-
----
-
-## Implementation Roadmap
-
-### Phase 1: Create GeometrySimplificationService (Priority: HIGH)
-
-**Effort:** 3-4 hours
-
-**Tasks:**
-
-1. Create `src/services/GeometrySimplificationService.ts`
-2. Implement `process()`, `computeMetrics()`, `determineLevel()`
-3. Implement Douglas-Peucker simplification
-4. Handle all geometry types including GeometryCollections
-5. Add unit tests
-
-**Files to Create:**
-
-- `src/services/GeometrySimplificationService.ts`
-- `tests/unit/services/geometrySimplificationService.test.ts`
-
----
-
-### Phase 2: Integrate with Orchestrator (Priority: HIGH)
-
-**Effort:** 2-3 hours
-
-**Tasks:**
-
-1. Track source type (TopoJSON vs GeoJSON) in data loading
-2. Call simplification service before layer creation
-3. Pass same simplified data to all layer types
-4. Add metrics logging for debugging
-
-**Files to Modify:**
-
-- `src/services/ChoroplethDataService.ts` - Track source type
-- `src/orchestration/ChoroplethOrchestrator.ts` - Apply simplification
-
----
-
-### Phase 3: Remove SVG Layer Internal Simplification (Priority: MEDIUM)
-
-**Effort:** 2-3 hours
-
-**Tasks:**
-
-1. Add `skipInternalSimplification` flag
-2. Bypass TopoJSON conversion when flag is true
-3. Update render method to use pre-simplified data
-4. Verify visual parity with old approach
-5. Remove obsolete code once stable
-
-**Files to Modify:**
-
-- `src/layers/choroplethLayer.ts`
-- `src/types/index.ts` (add option to interface)
-
----
-
-### Phase 4: Consolidate Spatial Indexing (Priority: LOW)
-
-**Effort:** 1-2 hours
-
-**Tasks:**
-
-1. Move rbush creation to orchestrator
-2. Add feature count threshold for index creation
-3. Pass shared index to layers
-4. Remove duplicate index creation from layers
-
-**Files to Modify:**
-
-- `src/orchestration/ChoroplethOrchestrator.ts`
-- `src/layers/choroplethLayer.ts`
-- `src/layers/canvas/choroplethCanvasLayer.ts`
-
----
-
-## Testing Requirements
-
-### Unit Tests
-
-```typescript
-describe('GeometrySimplificationService', () => {
-  describe('process()', () => {
-    it('should skip simplification for TopoJSON sources', () => {
-      const result = GeometrySimplificationService.process(geojson, {
-        sourceType: 'topojson',
-        strength: 50,
-        autoDetect: true
-      });
-      expect(result.wasSimplified).toBe(false);
-      expect(result.level).toBe('none');
+  describe('getFeatureColor()', () => {
+    it('should extract color from properties with exact match', () => {
+      expect(getFeatureColor({ color: '#ff0000' }, 'color')).toBe('#ff0000');
     });
     
-    it('should preserve 1-1 feature mapping', () => {
-      const result = GeometrySimplificationService.process(geojson, {
-        sourceType: 'geojson',
-        strength: 50,
-        autoDetect: true
-      });
-      expect(result.geojson.features.length).toBe(geojson.features.length);
+    it('should support case-insensitive fallback', () => {
+      expect(getFeatureColor({ Color: '#ff0000' }, 'color')).toBe('#ff0000');
+      expect(getFeatureColor({ COLOR: '#ff0000' }, 'color')).toBe('#ff0000');
     });
     
-    it('should not simplify Points', () => {
-      const pointFeature = { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] }};
-      const result = GeometrySimplificationService.simplifyGeometry(
-        pointFeature.geometry, 0.1
-      );
-      expect(result.coordinates).toEqual([1, 2]);
+    it('should support custom property names', () => {
+      expect(getFeatureColor({ fill: '#00ff00' }, 'fill')).toBe('#00ff00');
+      expect(getFeatureColor({ style_color: '#0000ff' }, 'style_color')).toBe('#0000ff');
     });
     
-    it('should handle GeometryCollections', () => {
-      const gc = {
-        type: 'GeometryCollection',
-        geometries: [
-          { type: 'Point', coordinates: [1, 2] },
-          { type: 'Polygon', coordinates: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] }
+    it('should return null for invalid colors', () => {
+      expect(getFeatureColor({ color: 'not-a-color' }, 'color')).toBe(null);
+      expect(getFeatureColor({ color: 123 }, 'color')).toBe(null);
+      expect(getFeatureColor(null, 'color')).toBe(null);
+    });
+  });
+  
+  describe('FeatureCollection styling', () => {
+    it('should style each feature independently', () => {
+      const fc = {
+        type: 'FeatureCollection',
+        features: [
+          { type: 'Feature', properties: { color: '#ff0000' }, geometry: { type: 'Point', coordinates: [0, 0] } },
+          { type: 'Feature', properties: { color: '#00ff00' }, geometry: { type: 'Point', coordinates: [1, 1] } }
         ]
       };
-      const result = GeometrySimplificationService.simplifyGeometry(gc, 0.1);
-      expect(result.type).toBe('GeometryCollection');
-      expect(result.geometries.length).toBe(2);
+      
+      const colors = fc.features.map(f => getFeatureColor(f.properties, 'color'));
+      expect(colors).toEqual(['#ff0000', '#00ff00']);
     });
   });
   
-  describe('determineLevel()', () => {
-    it('should return none for small datasets', () => {
-      const metrics = { featureCount: 100, totalVertices: 5000, avgVerticesPerFeature: 50 };
-      const level = GeometrySimplificationService.determineLevel(metrics, { strength: 50 });
-      expect(level).toBe('none');
-    });
-    
-    it('should return aggressive for very large datasets', () => {
-      const metrics = { featureCount: 15000, totalVertices: 2000000, avgVerticesPerFeature: 133 };
-      const level = GeometrySimplificationService.determineLevel(metrics, { strength: 50 });
-      expect(level).toBe('aggressive');
+  describe('GeometryCollection styling', () => {
+    it('should use same color for all nested geometries', () => {
+      const feature = {
+        type: 'Feature',
+        properties: { color: '#0000ff' },
+        geometry: {
+          type: 'GeometryCollection',
+          geometries: [
+            { type: 'Point', coordinates: [0, 0] },
+            { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }
+          ]
+        }
+      };
+      
+      // Color is extracted from feature.properties once
+      const color = getFeatureColor(feature.properties, 'color');
+      expect(color).toBe('#0000ff');
+      
+      // All geometries in the collection share this color
+      // (actual rendering tested in integration tests)
     });
   });
 });
 ```
 
-### Integration Tests
+---
 
-```typescript
-describe('Cross-Engine Consistency', () => {
-  it('should render same boundaries regardless of engine', async () => {
-    const geojson = loadTestData('complex-boundaries.geojson');
-    
-    // Get simplified data from orchestrator
-    const simplified = GeometrySimplificationService.process(geojson, options);
-    
-    // Render with each engine and compare bounding boxes
-    const svgBounds = renderWithSVG(simplified.geojson);
-    const canvasBounds = renderWithCanvas(simplified.geojson);
-    const webglBounds = renderWithWebGL(simplified.geojson);
-    
-    expect(svgBounds).toEqual(canvasBounds);
-    expect(canvasBounds).toEqual(webglBounds);
-  });
-});
-```
+## Estimated Effort
+
+| Task | Hours |
+|------|-------|
+| Create color utilities (`src/utils/color.ts`) | 1h |
+| Add settings to ChoroplethGroups.ts | 1h |
+| Update types and OptionsService | 0.5h |
+| Update SVG layer | 1.5h |
+| Update Canvas layer | 1h |
+| Update WebGL layer | 1.5h |
+| Unit tests for color utilities | 1h |
+| Integration testing (all engines) | 1.5h |
+| **Total** | **9h** |
 
 ---
 
 ## Summary
 
-| Enhancement | Priority | Effort | Impact |
-|-------------|----------|--------|--------|
-| Create GeometrySimplificationService | HIGH | 3-4h | Core functionality |
-| Integrate with Orchestrator | HIGH | 2-3h | Unified simplification |
-| Remove SVG internal simplification | MEDIUM | 2-3h | Consistency |
-| Consolidate spatial indexing | LOW | 1-2h | Performance |
+| Aspect | Description |
+|--------|-------------|
+| **New Settings** | `useFeatureColor` toggle, `featureColorProperty` text field |
+| **Color Formats** | `#RGB`, `#RRGGBB`, `#RRGGBBAA`, `rgb()`, `rgba()` |
+| **FeatureCollection** | Each feature can have unique color |
+| **GeometryCollection** | All nested geometries share parent's color |
+| **Fallback** | Color scale → NO_DATA_COLOR |
+| **Engines** | SVG, Canvas, WebGL (consistent behavior) |
+| **Nested Styles** | Points/Lines use dedicated settings when shown |
 
-**Total Estimated Effort:** 8-12 hours
+---
 
-**Key Benefits:**
+# Mapbox Tileset as Choropleth Boundary Source
 
-1. ✅ Maintains 1-1 Power BI data relationship
-2. ✅ Supports all GeoJSON geometry types
-3. ✅ Consistent rendering across all engines
-4. ✅ Evidence-based, adaptive simplification
-5. ✅ Respects pre-optimized TopoJSON sources
-6. ✅ Smaller features preserved appropriately
+## Investigation Summary (December 2024)
+
+### Current Architecture Analysis
+
+The current choropleth boundary data pipeline supports two sources:
+
+1. **GeoBoundaries** - Pre-packaged administrative boundary datasets via API/manifest
+2. **Custom** - User-provided TopoJSON/GeoJSON URL
+
+**Data Flow (GeoJSON Sources):**
+
+```text
+Boundary Source → HTTP Fetch → TopoJSON/GeoJSON → processGeoData() → FeatureCollection
+                                                                            ↓
+                                                              ┌─────────────┼─────────────┐
+                                                              ▼             ▼             ▼
+                                                           SVG Layer   Canvas Layer  WebGL Layer
+```
+
+### Render Engine Impact Analysis
+
+#### Current Render Engines (for GeoJSON/TopoJSON)
+
+| Engine | Layer Class | How It Works |
+|--------|-------------|--------------|
+| **SVG** | `ChoroplethSvgLayer` | D3.js `geoPath()` → SVG `<path>` elements |
+| **Canvas** | `ChoroplethCanvasLayer` | Canvas 2D context path drawing |
+| **WebGL** | `ChoroplethWebGLLayer` | OpenLayers WebGL with custom shaders |
+
+**All three expect pre-processed GeoJSON FeatureCollection as input.**
+
+#### Vector Tiles Are Fundamentally Different
+
+OpenLayers `VectorTileLayer`:
+
+- **Renders via OpenLayers' internal pipeline** — not through our custom layer classes
+- Tiles stream in progressively as user pans/zooms
+- Style function called per-feature as tiles load
+- **Bypasses D3-based SVG and our custom Canvas/WebGL layers entirely**
+
+#### Implication: Render Engine Selection is Irrelevant for Tilesets
+
+| Source Type | Render Engine Dropdown | Why |
+|-------------|------------------------|-----|
+| GeoBoundaries | ✅ Relevant | User chooses SVG/Canvas/WebGL |
+| Custom (GeoJSON) | ✅ Relevant | User chooses SVG/Canvas/WebGL |
+| **Mapbox Tileset** | ❌ **Irrelevant** | OpenLayers handles rendering internally |
+
+**Recommendation:** Hide the render engine selector when Mapbox Tileset is selected.
+
+---
+
+### Key Findings
+
+1. **OpenLayers Vector Tile Support Available**
+   - Package `ol/source/VectorTile` already imported in `MapService.ts`
+   - `ol-mapbox-style` (v12.4.0) provides `MapboxVectorLayer`
+   - OpenLayers natively supports MVT (Mapbox Vector Tile) format
+
+2. **Mapbox Access Token Already Configurable**
+   - Token available via data role `MapboxAccessToken`
+   - Token also in Basemap settings (`mapboxAccessToken`)
+   - Same token reusable for tileset boundary source
+
+3. **Classification Does NOT Require Full Tileset**
+   - Class breaks computed from **Power BI data values** (not tileset properties)
+   - We pre-build `Map<pcode, color>` lookup from data
+   - Apply colors dynamically as tiles stream in
+
+4. **Performance Comparison**
+
+   | Approach | Load Time | Memory | LOD | Complexity |
+   |----------|-----------|--------|-----|------------|
+   | Fetch tileset → GeoJSON | ❌ Slow (full download) | ❌ High | ❌ None | Low |
+   | Native MVT rendering | ✅ Fast (streaming) | ✅ Low | ✅ Built-in | Medium |
+
+---
+
+### Recommended Approach: Native Vector Tile Rendering
+
+Skip GeoJSON conversion. Use OpenLayers `VectorTileLayer` directly.
+
+**Why This Works:**
+
+```typescript
+// Classification is computed from Power BI data, NOT from tileset
+const colorValues = [45, 78, 23, 91, ...];  // From Power BI measure
+const classBreaks = ss.ckmeans(colorValues, numClasses);  // Already computed
+const colorScale = chroma.scale(['#fff', '#00f']).classes(classBreaks);
+
+// Build lookup: pcode → color
+const colorLookup = new Map<string, string>();
+pcodes.forEach((pcode, i) => {
+    colorLookup.set(pcode, colorScale(colorValues[i]).hex());
+});
+
+// Apply to tiles as they load (no need to fetch all features upfront)
+const styleFunction = (feature: FeatureLike) => {
+    const pcode = feature.get('pcode');
+    const color = colorLookup.get(pcode) || '#cccccc';
+    return new Style({ fill: new Fill({ color }) });
+};
+```
+
+---
+
+## Implementation Plan (Native MVT)
+
+### Architecture for Mapbox Tileset Source
+
+```text
+Power BI Data ──────────────────────────────────────────────────────────┐
+     │                                                                   │
+     ▼                                                                   │
+┌────────────────────┐                                                   │
+│ Compute classBreaks│ ← From measure values (colorValues array)        │
+│ Build colorLookup  │ ← Map<pcode, color>                              │
+└─────────┬──────────┘                                                   │
+          │                                                              │
+          │    ┌─────────────────────────────────────────────────────────┘
+          │    │
+          ▼    ▼
+┌─────────────────────────────────────────────────────────┐
+│              VectorTileLayer (OpenLayers)               │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ VectorTileSource                                  │  │
+│  │   url: mapbox://v4/{tilesetId}/{z}/{x}/{y}.mvt    │  │
+│  │   format: MVT                                     │  │
+│  └───────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ styleFunction(feature)                            │  │
+│  │   → lookup color by feature.pcode                 │  │
+│  │   → return Style with fill color                  │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+          │
+          ▼
+   OpenLayers internal Canvas/WebGL rendering
+   (No SVG option — OL uses Canvas by default)
+```
+
+---
+
+### Phase 1: Settings & Types
+
+#### 1.1 Update Boundary Source Dropdown
+
+```typescript
+// In ChoroplethLocationBoundarySettingsGroup
+boundaryDataSource: DropDown = new DropDown({
+    name: "boundaryDataSource",
+    displayName: "Boundary Source",
+    value: { value: "geoboundaries", displayName: "GeoBoundaries" },
+    items: [
+        { value: "geoboundaries", displayName: "GeoBoundaries" },
+        { value: "mapbox", displayName: "Mapbox Tileset" },
+        { value: "custom", displayName: "Custom" }
+    ]
+});
+```
+
+#### 1.2 New Mapbox Tileset Settings
+
+```typescript
+mapboxTilesetId: TextInput = new TextInput({
+    name: "mapboxTilesetId",
+    displayName: "Tileset ID",
+    description: "Mapbox Tileset ID (e.g., mapbox.country-boundaries-v1)",
+    value: "",
+    placeholder: "mapbox.country-boundaries-v1"
+});
+
+mapboxTilesetSourceLayer: TextInput = new TextInput({
+    name: "mapboxTilesetSourceLayer",
+    displayName: "Source Layer",
+    description: "Layer name within tileset containing boundaries",
+    value: "",
+    placeholder: "country_boundaries"
+});
+
+mapboxTilesetIdField: TextInput = new TextInput({
+    name: "mapboxTilesetIdField",
+    displayName: "ID Property",
+    description: "Property name in tileset features to match with data (e.g., iso_3166_1)",
+    value: "",
+    placeholder: "iso_3166_1"
+});
+```
+
+#### 1.3 Types Update
+
+```typescript
+// In ChoroplethOptions
+export interface ChoroplethOptions {
+    // ... existing ...
+    
+    // Mapbox Tileset
+    mapboxTilesetId?: string;
+    mapboxTilesetSourceLayer?: string;
+    mapboxTilesetIdField?: string;
+}
+```
+
+---
+
+### Phase 2: Vector Tile Layer Implementation
+
+#### 2.1 Create ChoroplethVectorTileLayer
+
+```typescript
+// src/layers/ChoroplethVectorTileLayer.ts
+import VectorTileLayer from 'ol/layer/VectorTile';
+import VectorTileSource from 'ol/source/VectorTile';
+import MVT from 'ol/format/MVT';
+import { Style, Fill, Stroke } from 'ol/style';
+
+export interface ChoroplethVectorTileOptions {
+    tilesetId: string;
+    accessToken: string;
+    sourceLayer: string;
+    idField: string;
+    colorLookup: Map<string, string>;
+    strokeColor: string;
+    strokeWidth: number;
+    opacity: number;
+}
+
+export class ChoroplethVectorTileLayer extends VectorTileLayer {
+    private colorLookup: Map<string, string>;
+    private idField: string;
+    private strokeColor: string;
+    private strokeWidth: number;
+    
+    constructor(options: ChoroplethVectorTileOptions) {
+        const source = new VectorTileSource({
+            format: new MVT(),
+            url: `https://api.mapbox.com/v4/${options.tilesetId}/{z}/{x}/{y}.mvt?access_token=${options.accessToken}`,
+        });
+        
+        super({
+            source,
+            opacity: options.opacity,
+            declutter: false,
+        });
+        
+        this.colorLookup = options.colorLookup;
+        this.idField = options.idField;
+        this.strokeColor = options.strokeColor;
+        this.strokeWidth = options.strokeWidth;
+        
+        this.setStyle(this.createStyleFunction());
+    }
+    
+    private createStyleFunction() {
+        return (feature: FeatureLike) => {
+            const id = feature.get(this.idField);
+            const color = this.colorLookup.get(String(id)) || 'rgba(200,200,200,0.5)';
+            
+            return new Style({
+                fill: new Fill({ color }),
+                stroke: new Stroke({
+                    color: this.strokeColor,
+                    width: this.strokeWidth
+                })
+            });
+        };
+    }
+    
+    public updateColorLookup(colorLookup: Map<string, string>) {
+        this.colorLookup = colorLookup;
+        this.changed(); // Trigger re-render
+    }
+}
+```
+
+#### 2.2 Update ChoroplethOrchestrator
+
+```typescript
+// In fetchAndRenderChoroplethLayer
+if (choroplethOptions.boundaryDataSource === "mapbox") {
+    // Validate
+    if (!choroplethOptions.mapboxTilesetId) {
+        this.host.displayWarningIcon("Config Error", "Mapbox Tileset ID is required");
+        return;
+    }
+    
+    const accessToken = basemapOptions.mapboxAccessToken;
+    if (!accessToken) {
+        this.host.displayWarningIcon("Config Error", "Mapbox Access Token is required");
+        return;
+    }
+    
+    // Build color lookup from Power BI data
+    const colorLookup = new Map<string, string>();
+    dataPoints.forEach(dp => {
+        const color = dataService.getColorFromClassBreaks(dp.value, classBreaks, colorScale);
+        colorLookup.set(dp.pcode, color);
+    });
+    
+    // Create vector tile layer (bypasses our SVG/Canvas/WebGL layers)
+    this.choroplethLayer = new ChoroplethVectorTileLayer({
+        tilesetId: choroplethOptions.mapboxTilesetId,
+        accessToken,
+        sourceLayer: choroplethOptions.mapboxTilesetSourceLayer || '',
+        idField: choroplethOptions.mapboxTilesetIdField || 'id',
+        colorLookup,
+        strokeColor: choroplethOptions.strokeColor,
+        strokeWidth: choroplethOptions.strokeWidth,
+        opacity: choroplethOptions.layerOpacity
+    });
+    
+    this.map.addLayer(this.choroplethLayer);
+    return; // Skip normal GeoJSON rendering path
+}
+```
+
+---
+
+### Phase 3: Feature Parity Considerations
+
+| Feature | GeoJSON Layers | Vector Tile Layer | Notes |
+|---------|----------------|-------------------|-------|
+| **Fill colors** | ✅ Full control | ✅ Style function | Same result |
+| **Stroke styling** | ✅ Per-feature | ✅ Style function | Same result |
+| **Opacity** | ✅ Layer-level | ✅ Layer-level | Same |
+| **Tooltips** | ✅ D3/custom events | ⚠️ OL forEachFeatureAtPixel | Different API |
+| **Selection** | ✅ Custom handlers | ⚠️ OL click events | Different API |
+| **Legend** | ✅ From data | ✅ From data | Same (data-driven) |
+| **Zoom-to-extent** | ✅ From GeoJSON bounds | ⚠️ Not automatic | Need viewport fitting |
+| **Render engine choice** | ✅ SVG/Canvas/WebGL | ❌ N/A (OL internal) | Hide dropdown |
+
+#### Tooltip & Selection Parity for Vector Tiles
+
+**Current Approach (GeoJSON Layers)**:
+- Uses `powerbi-visuals-utils-tooltiputils` `ITooltipServiceWrapper.addTooltip()`
+- Attaches to D3 selections via pointer events
+- Gets tooltip data via `getTooltipInfoDelegate(datapoint) → VisualTooltipDataItem[]`
+- Gets selection ID via `getDataPointIdentity(datapoint) → ISelectionId`
+- Uses `event.clientX/clientY` for tooltip positioning
+- Calls `selectionManager.select(selectionId, ctrlKey)` on click
+
+**Challenge with Vector Tiles**:
+- Vector tile features are rendered internally by OpenLayers
+- No D3 selection to attach `addTooltip()` to
+- Feature data comes from tile, not our `ChoroplethDataPoint[]`
+- Need to bridge OL feature → Power BI dataPoint lookup
+
+**Solution: Manual Power BI Tooltip Service Integration**
+
+```typescript
+// In ChoroplethVectorTileLayer class
+private tooltipLookup: Map<string, VisualTooltipDataItem[]>;
+private selectionIdLookup: Map<string, ISelectionId>;
+
+// Build lookup tables from dataPoints
+public setDataPoints(dataPoints: ChoroplethDataPoint[]) {
+    this.tooltipLookup = new Map();
+    this.selectionIdLookup = new Map();
+    for (const dp of dataPoints) {
+        this.tooltipLookup.set(dp.pcode, dp.tooltip);
+        this.selectionIdLookup.set(dp.pcode, dp.selectionId);
+    }
+}
+
+// Tooltip via direct host.tooltipService call
+private setupTooltipHandling() {
+    // Show tooltip on pointer move
+    this.map.on('pointermove', (evt: MapBrowserEvent<PointerEvent>) => {
+        const features = this.map.getFeaturesAtPixel(evt.pixel, {
+            layerFilter: (layer) => layer === this.vectorTileLayer
+        });
+        
+        if (features.length > 0) {
+            const feature = features[0];
+            const pcode = feature.get(this.options.idField);
+            const tooltipData = this.tooltipLookup.get(pcode);
+            
+            if (tooltipData) {
+                // Call Power BI tooltip service directly (same as tooltiputils internally does)
+                this.options.host.tooltipService.show({
+                    coordinates: [evt.originalEvent.clientX, evt.originalEvent.clientY],
+                    isTouchEvent: false,
+                    dataItems: tooltipData,
+                    identities: [this.selectionIdLookup.get(pcode)]
+                });
+            }
+        } else {
+            this.options.host.tooltipService.hide({
+                immediately: false,
+                isTouchEvent: false
+            });
+        }
+    });
+    
+    // Hide tooltip on pointer leave
+    this.map.getTargetElement().addEventListener('pointerout', () => {
+        this.options.host.tooltipService.hide({
+            immediately: true,
+            isTouchEvent: false
+        });
+    });
+}
+
+// Selection via OpenLayers click
+private setupSelectionHandling() {
+    this.map.on('click', (evt: MapBrowserEvent<PointerEvent>) => {
+        const features = this.map.getFeaturesAtPixel(evt.pixel, {
+            layerFilter: (layer) => layer === this.vectorTileLayer
+        });
+        
+        if (features.length > 0) {
+            const feature = features[0];
+            const pcode = feature.get(this.options.idField);
+            const selectionId = this.selectionIdLookup.get(pcode);
+            
+            if (selectionId) {
+                const additive = evt.originalEvent.ctrlKey || evt.originalEvent.metaKey;
+                this.options.selectionManager.select(selectionId as any, additive)
+                    .then((selectedIds: ISelectionId[]) => {
+                        this.selectedIds = selectedIds;
+                        this.updateStyles(); // Re-style for selection highlighting
+                    });
+            }
+        } else {
+            // Click on empty area - clear selection
+            this.options.selectionManager.clear();
+        }
+    });
+    
+    // Context menu (right-click) for Power BI menu
+    this.map.getTargetElement().addEventListener('contextmenu', (event: MouseEvent) => {
+        event.preventDefault();
+        const pixel = this.map.getEventPixel(event);
+        const features = this.map.getFeaturesAtPixel(pixel, {
+            layerFilter: (layer) => layer === this.vectorTileLayer
+        });
+        
+        if (features.length > 0) {
+            const feature = features[0];
+            const pcode = feature.get(this.options.idField);
+            const selectionId = this.selectionIdLookup.get(pcode);
+            
+            this.options.selectionManager.showContextMenu(
+                selectionId ? selectionId : {},
+                { x: event.clientX, y: event.clientY }
+            );
+        }
+    });
+}
+```
+
+**Key Parity Points**:
+
+| Aspect | GeoJSON Layers | Vector Tile Layer | Parity |
+|--------|----------------|-------------------|--------|
+| Tooltip source | Power BI tooltips | Power BI tooltips | ✅ Same |
+| Tooltip positioning | clientX/clientY | clientX/clientY | ✅ Same |
+| Tooltip data | ChoroplethDataPoint.tooltip | Lookup by pcode | ✅ Same data |
+| Selection API | selectionManager.select() | selectionManager.select() | ✅ Same |
+| Ctrl+click multi-select | ✅ Supported | ✅ Supported | ✅ Same |
+| Context menu | selectionManager.showContextMenu() | selectionManager.showContextMenu() | ✅ Same |
+| Selection highlighting | Re-render with opacity | Style function update | ✅ Same visual |
+
+**Dependencies**:
+- Need `IVisualHost` passed to layer for `host.tooltipService` access
+- Need `ISelectionManager` for selection handling
+- Need `ChoroplethDataPoint[]` to build lookup tables
+
+---
+
+### Conditional UI Updates
+
+```typescript
+// In applyConditionalDisplayRules()
+const isMapbox = this.boundaryDataSource.value?.value === "mapbox";
+
+// Mapbox-specific settings
+this.mapboxTilesetId.visible = isMapbox;
+this.mapboxTilesetSourceLayer.visible = isMapbox;
+this.mapboxTilesetIdField.visible = isMapbox;
+
+// Hide render engine when using Mapbox (OL handles it)
+// This would be in MapToolsSettingsGroup
+// renderEngine.visible = !isMapbox;
+```
+
+---
+
+## Estimated Effort (Native MVT)
+
+| Task | Hours |
+|------|-------|
+| Settings update (dropdown, 3 new fields) | 1h |
+| Types and OptionsService update | 0.5h |
+| ChoroplethVectorTileLayer class | 2h |
+| Orchestrator integration | 1.5h |
+| Tooltip/Selection for vector tiles | 2h |
+| Conditional visibility rules | 0.5h |
+| Hide render engine for Mapbox source | 0.5h |
+| Unit tests | 1.5h |
+| Integration testing | 1.5h |
+| **Total** | **11h** |
+
+---
+
+## API Reference
+
+### Mapbox MVT Tile URL
+
+```text
+https://api.mapbox.com/v4/{tileset_id}/{z}/{x}/{y}.mvt?access_token={token}
+```
+
+### Example Tilesets
+
+| Tileset ID | Description |
+|------------|-------------|
+| `mapbox.country-boundaries-v1` | Country boundaries |
+| `mapbox.mapbox-streets-v8` | Streets with admin boundaries |
+| `{username}.{tileset_name}` | Custom uploaded tileset |
+
+---
+
+## Open Questions
+
+1. **Tileset Discovery**: How will users find their tileset ID and source layer name?
+   - *Mitigation*: Provide examples in tooltip/placeholder text
+2. ~~**Tooltip/Selection Parity**: Ensure Power BI tooltips and selection work~~ ✅ **Solved** - Use `host.tooltipService` directly
+3. **Fallback**: Show message if tileset fails to load
+4. **Caching**: OL handles tile caching, but token expiry?
+5. **Multiple source layers**: Support filtering if tileset has multiple layers?
+
+---
+
+## Next Steps
+
+1. [ ] Add "Mapbox Tileset" to boundary source dropdown
+2. [ ] Add Tileset ID, Source Layer, ID Field settings
+3. [ ] Create `ChoroplethVectorTileLayer` class
+4. [ ] Update `ChoroplethOrchestrator` for "mapbox" source
+5. [ ] Implement tooltip/selection for vector tiles
+6. [ ] Hide render engine dropdown when Mapbox selected
+7. [ ] Write unit tests
+8. [ ] Test with `mapbox.country-boundaries-v1`

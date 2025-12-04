@@ -134,6 +134,8 @@ export class ChoroplethLayerOptionsBuilder {
         simplificationStrength?: number;
         preparedGeometry?: PreparedGeometry;
         nestedGeometryStyle?: NestedGeometryStyle;
+        useFeatureColor?: boolean;
+        featureColorProperty?: string;
     }): ChoroplethLayerOptions {
         return {
             geojson: params.geojson,
@@ -152,6 +154,8 @@ export class ChoroplethLayerOptionsBuilder {
             simplificationStrength: params.simplificationStrength,
             preparedGeometry: params.preparedGeometry,
             nestedGeometryStyle: params.nestedGeometryStyle,
+            useFeatureColor: params.useFeatureColor,
+            featureColorProperty: params.featureColorProperty,
             dataPoints: params.dataPoints,
             allowInteractions: this.allowInteractions,
             isHighContrast: this.isHighContrast,

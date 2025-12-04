@@ -38,40 +38,45 @@ describe("LegendService createChoroplethLegend ordering", () => {
         return Array.from(itemsContainer.children) as HTMLElement[];
     }
 
-    it("sorts numeric unique categories ascending and preserves colors", () => {
+    it("maintains class order for unique categories and preserves colors", () => {
         const options = {
             ...baseOptions,
             classificationMethod: ClassificationMethods.Unique,
         };
 
+        // Class breaks are provided in class order (Class 1, Class 2, Class 3)
+        // Legend should maintain this order, not sort by value
         service.createChoroplethLegend(
             [3, 1, 2],
-            [3, 1, 2],
-            ["#ff0000", "#00ff00", "#0000ff"],
+            [3, 1, 2],  // Class 1 = 3, Class 2 = 1, Class 3 = 2
+            ["#ff0000", "#00ff00", "#0000ff"],  // Colors assigned to classes in order
             options,
         );
 
         const items = extractLegendItems();
         const labels = items.map((item) => item.getAttribute("data-legend-label"));
-        expect(labels).toEqual(["1", "2", "3"]);
+        // Should maintain class order (3, 1, 2) not sorted order (1, 2, 3)
+        expect(labels).toEqual(["3", "1", "2"]);
 
         const backgrounds = items.map((item) => {
             const swatch = item.children[0] as HTMLElement;
             return swatch.style.backgroundColor;
         });
+        // Colors match class order: Class 1 = red, Class 2 = green, Class 3 = blue
         expect(backgrounds).toEqual([
+            "rgb(255, 0, 0)",
             "rgb(0, 255, 0)",
             "rgb(0, 0, 255)",
-            "rgb(255, 0, 0)",
         ]);
     });
 
-    it("sorts textual unique categories case-insensitively and keeps assigned colors", () => {
+    it("maintains class order for textual unique categories and keeps assigned colors", () => {
         const options = {
             ...baseOptions,
             classificationMethod: ClassificationMethods.Unique,
         };
 
+        // Class breaks in class order: Class 1 = delta, Class 2 = Alpha, etc.
         service.createChoroplethLegend(
             [1, 2, 3, 4],
             ["delta", "Alpha", "charlie", "bravo"] as any,
@@ -81,17 +86,19 @@ describe("LegendService createChoroplethLegend ordering", () => {
 
         const items = extractLegendItems();
         const labels = items.map((item) => item.getAttribute("data-legend-label"));
-        expect(labels).toEqual(["Alpha", "bravo", "charlie", "delta"]);
+        // Should maintain class order, not alphabetical order
+        expect(labels).toEqual(["delta", "Alpha", "charlie", "bravo"]);
 
         const backgrounds = items.map((item) => {
             const swatch = item.children[0] as HTMLElement;
             return swatch.style.backgroundColor;
         });
+        // Colors match class order
         expect(backgrounds).toEqual([
-            "rgb(34, 34, 34)",
-            "rgb(68, 68, 68)",
-            "rgb(51, 51, 51)",
             "rgb(17, 17, 17)",
+            "rgb(34, 34, 34)",
+            "rgb(51, 51, 51)",
+            "rgb(68, 68, 68)",
         ]);
     });
 });

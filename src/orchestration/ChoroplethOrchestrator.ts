@@ -24,6 +24,7 @@ import { ChoroplethLayerOptionsBuilder } from "../services/LayerOptionBuilders";
 import { filterValidPCodes, parseChoroplethCategorical, validateChoroplethInput } from "../data/choropleth";
 import { MessageService } from "../services/MessageService";
 import { ChoroplethCanvasLayer } from "../layers/canvas/choroplethCanvasLayer";
+import { ChoroplethVectorTileLayer } from "../layers/vectortile/choroplethVectorTileLayer";
 import { UniqueClassificationService } from "../services/UniqueClassificationService";
 
 /**
@@ -41,7 +42,7 @@ import { UniqueClassificationService } from "../services/UniqueClassificationSer
  */
 export class ChoroplethOrchestrator extends BaseOrchestrator {
     private cacheService: CacheService;
-    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined;
+    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | ChoroplethVectorTileLayer | undefined;
     private abortController: AbortController | null = null;
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
     private uniqueClassification: UniqueClassificationService;
@@ -107,9 +108,9 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     /**
      * Returns the current choropleth layer instance if one exists.
      * 
-     * @returns The active choropleth layer (Canvas, WebGL, or SVG), or undefined if not rendered
+     * @returns The active choropleth layer (Canvas, WebGL, SVG, or VectorTile), or undefined if not rendered
      */
-    public getLayer(): ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined {
+    public getLayer(): ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | ChoroplethVectorTileLayer | undefined {
         return this.choroplethLayer as any;
     }
 
@@ -323,6 +324,17 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions
     ): Promise<void> {
+        // ================================================================================
+        // MAPBOX TILESET SOURCE - Vector Tiles (MVT) with streaming tiles, no fetch
+        // ================================================================================
+        if (choroplethOptions.boundaryDataSource === "mapbox") {
+            await this.renderMapboxVectorTileLayer(choroplethOptions, classBreaks, colorScale, dataPoints, mapToolsOptions, dataService);
+            return;
+        }
+
+        // ================================================================================
+        // GEOBOUNDARIES / CUSTOM SOURCE - GeoJSON/TopoJSON with data fetch
+        // ================================================================================
     let serviceUrl: string;
         let cacheKey: string;
 
@@ -515,7 +527,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 strokeColor: choroplethOptions.strokeColor,
                 strokeWidth: choroplethOptions.strokeWidth,
                 fillOpacity: choroplethOptions.layerOpacity,
-                colorScale: (value: any) => dataService.getColorFromClassBreaks(value, classBreaks, colorScale, choroplethOptions.classificationMethod),
+                colorScale: (value: any) => dataService.getColorFromClassBreaks(value, classBreaks, colorScale, choroplethOptions.classificationMethod, choroplethOptions.othersColor, choroplethOptions.categoryValues, choroplethOptions.categoryColors),
                 dataKey: pcodeKey,
                 categoryValues: AdminPCodeNameIDCategory.values,
                 measureValues: colorMeasure.values,
@@ -523,6 +535,9 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 simplificationStrength: choroplethOptions.simplificationStrength,
                 // Pass prepared geometry for layers that want to inspect it
                 preparedGeometry,
+                // Feature color property support
+                useFeatureColor: choroplethOptions.useFeatureColor,
+                featureColorProperty: choroplethOptions.featureColorProperty,
                 nestedGeometryStyle: {
                     showPoints: choroplethOptions.showNestedPoints,
                     pointRadius: choroplethOptions.nestedPointRadius,
@@ -537,6 +552,101 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
 
             this.renderChoroplethLayerOnMap(layerOptions, mapToolsOptions);
         } catch (error) { this.messages.choroplethFetchError(); }
+    }
+
+    /**
+     * Renders a Mapbox Vector Tile layer for choropleth visualization.
+     * Uses streaming MVT tiles instead of fetching GeoJSON upfront.
+     * 
+     * @param choroplethOptions - Choropleth configuration including tileset settings
+     * @param classBreaks - Classification break points for coloring
+     * @param colorScale - Color scale array
+     * @param dataPoints - Data points with selection IDs and values
+     * @param mapToolsOptions - Map tools configuration
+     * @param dataService - Data service for color mapping
+     */
+    private async renderMapboxVectorTileLayer(
+        choroplethOptions: ChoroplethOptions,
+        classBreaks: number[],
+        colorScale: string[],
+        dataPoints: any[],
+        mapToolsOptions: MapToolsOptions,
+        dataService: ChoroplethDataService
+    ): Promise<void> {
+        // Validate required Mapbox settings
+        if (!choroplethOptions.mapboxTilesetId?.trim()) {
+            this.host.displayWarningIcon(
+                "Missing Mapbox Tileset ID",
+                "roseaMapVizWarning: Please enter a Mapbox Tileset ID. Format: username.tileset-name"
+            );
+            return;
+        }
+
+        if (!choroplethOptions.mapboxTilesetSourceLayer?.trim()) {
+            this.host.displayWarningIcon(
+                "Missing Source Layer",
+                "roseaMapVizWarning: Please enter the source layer name from your tileset (found in TileJSON)."
+            );
+            return;
+        }
+
+        if (!choroplethOptions.mapboxAccessToken?.trim()) {
+            this.host.displayWarningIcon(
+                "Missing Mapbox Access Token",
+                "roseaMapVizWarning: A Mapbox public access token (pk.*) is required. Add it via the data role or basemap settings."
+            );
+            return;
+        }
+
+        // Validate token type - must be public token for style tiles
+        const token = choroplethOptions.mapboxAccessToken.trim();
+        if (token.startsWith('sk.')) {
+            this.host.displayWarningIcon(
+                "Invalid Token Type",
+                "roseaMapVizWarning: Secret tokens (sk.*) cannot be used in browser. Use a public token (pk.*) - public tilesets work with public tokens."
+            );
+            return;
+        }
+
+        // Dispose of any existing choropleth layer
+        if (this.choroplethLayer) {
+            try { (this.choroplethLayer as any).dispose?.(); } catch {}
+            try { this.map.removeLayer(this.choroplethLayer); } catch {}
+        }
+
+        // Create color scale function using the same logic as other layers
+        // This ensures consistent color mapping for all classification methods including Unique
+        const colorScaleFn = (value: any) => dataService.getColorFromClassBreaks(
+            value, 
+            classBreaks, 
+            colorScale, 
+            choroplethOptions.classificationMethod, 
+            choroplethOptions.othersColor, 
+            choroplethOptions.categoryValues,
+            choroplethOptions.categoryColors
+        );
+
+        // Create the vector tile layer using direct v4 API access
+        const vtLayer = new ChoroplethVectorTileLayer({
+            tilesetId: choroplethOptions.mapboxTilesetId.trim(),
+            sourceLayer: choroplethOptions.mapboxTilesetSourceLayer.trim(),
+            idField: choroplethOptions.mapboxTilesetIdField?.trim() || 'iso_3166_1_alpha_3',
+            accessToken: token,
+            colorScale: colorScaleFn,
+            classBreaks,
+            dataPoints,
+            strokeColor: choroplethOptions.strokeColor,
+            strokeWidth: choroplethOptions.strokeWidth,
+            fillOpacity: choroplethOptions.layerOpacity,
+            host: this.host,
+            selectionManager: this.selectionManager,
+        });
+
+        this.choroplethLayer = vtLayer;
+        this.map.addLayer(vtLayer);
+        
+        // Attach to map for tooltip/selection interactions and fit-to-extent after tiles load
+        vtLayer.attachToMap(this.map);
     }
 
     /**

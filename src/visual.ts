@@ -242,8 +242,37 @@ export class RoseaMapViz implements IVisual {
 
             // Apply conditional display logic
             this.visualFormattingSettingsModel.BasemapVisualCardSettings.applyConditionalDisplayRules();
-            this.visualFormattingSettingsModel.ChoroplethVisualCardSettings.choroplethDisplaySettingsGroup.applyConditionalDisplayRules();
             this.visualFormattingSettingsModel.ChoroplethVisualCardSettings.choroplethLocationBoundarySettingsGroup.applyConditionalDisplayRules();
+            
+            // Auto-detect unique values from color data for classification settings
+            // Uses stable ordering - values persist across filtering
+            const classificationGroup = this.visualFormattingSettingsModel.ChoroplethVisualCardSettings.choroplethClassificationSettingsGroup;
+            if (categorical) {
+                const colorMeasure = categorical.values?.find(v => v.source.roles?.['Color']);
+                if (colorMeasure?.values) {
+                    // Get unique values, convert to strings, sort, take top 7
+                    const uniqueValues = Array.from(new Set(
+                        colorMeasure.values
+                            .filter(v => v !== null && v !== undefined)
+                            .map(v => String(v).trim())
+                    )).sort((a, b) => {
+                        // Try numeric sort first, then string sort
+                        const numA = parseFloat(a);
+                        const numB = parseFloat(b);
+                        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                        return a.localeCompare(b);
+                    });
+                    // Pass measure query name for stable color tracking across filter changes
+                    const measureQueryName = colorMeasure.source?.queryName;
+                    classificationGroup.setDataDetectedValues(
+                        uniqueValues.slice(0, 7), 
+                        uniqueValues.length,
+                        measureQueryName
+                    );
+                }
+            }
+            classificationGroup.applyConditionalDisplayRules();
+            
             this.visualFormattingSettingsModel.mapControlsVisualCardSettings.mapToolsSettingsGroup.applyConditionalDisplayRules();
             this.visualFormattingSettingsModel.mapControlsVisualCardSettings.legendContainerSettingsGroup.applyConditionalDisplayRules();
 
@@ -261,7 +290,9 @@ export class RoseaMapViz implements IVisual {
                 maptilerApiKey: maptilerCredential
             });
             const circleOptions = OptionsService.getCircleOptions(this.visualFormattingSettingsModel);
-            const choroplethOptions = OptionsService.getChoroplethOptions(this.visualFormattingSettingsModel);
+            const choroplethOptions = OptionsService.getChoroplethOptions(this.visualFormattingSettingsModel, {
+                mapboxAccessToken: mapboxCredential,
+            });
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
             if (this.mapToolsOptions.renderEngine === 'webgl' && !isWebGLAvailable()) {
                 this.mapToolsOptions = { ...this.mapToolsOptions, renderEngine: 'canvas' } as any;

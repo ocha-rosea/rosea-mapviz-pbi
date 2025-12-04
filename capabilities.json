@@ -93,8 +93,10 @@
         },
         {
           "integer": true
+        },
+        {
+          "text": true
         }
-        
       ]
     },
     {
@@ -462,6 +464,21 @@
             "text": true
           }
         },
+        "mapboxTilesetId": {
+          "type": {
+            "text": true
+          }
+        },
+        "mapboxTilesetSourceLayer": {
+          "type": {
+            "text": true
+          }
+        },
+        "mapboxTilesetIdField": {
+          "type": {
+            "text": true
+          }
+        },
         "numClasses": {
           "type": {
             "numeric": true
@@ -470,6 +487,113 @@
         "classificationMethod": {
           "type": {
             "enumeration": []
+          }
+        },
+        "category1Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category2Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category3Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category4Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category5Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category6Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category7Color": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "othersColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "category1Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category2Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category3Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category4Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category5Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category6Value": {
+          "type": {
+            "text": true
+          }
+        },
+        "category7Value": {
+          "type": {
+            "text": true
           }
         },
         "colorRamp": {
@@ -514,6 +638,16 @@
         "simplificationStrength": {
           "type": {
             "numeric": true
+          }
+        },
+        "useFeatureColor": {
+          "type": {
+            "bool": true
+          }
+        },
+        "featureColorProperty": {
+          "type": {
+            "text": true
           }
         },
         "showLegend": {

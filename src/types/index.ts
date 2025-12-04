@@ -300,6 +300,10 @@ export interface ChoroplethLayerOptions extends LayerOptions {
     preparedGeometry?: PreparedGeometry;
     /** Styling options for nested geometries in GeometryCollections (points, lines) */
     nestedGeometryStyle?: NestedGeometryStyle;
+    /** Whether to use color property from feature properties */
+    useFeatureColor?: boolean;
+    /** Property name to look for color values (default: "color") */
+    featureColorProperty?: string;
     dataPoints?: Array<{
         pcode: string;
         value: number;
@@ -403,6 +407,16 @@ export interface ChoroplethOptions {
     topoJSON_geoJSON_FileUrl: string,
     topojsonObjectName?: string,
 
+    // Mapbox Tileset-specific options
+    /** Mapbox tileset ID (e.g., 'mapbox.country-boundaries-v1') */
+    mapboxTilesetId?: string;
+    /** Source layer name within the tileset */
+    mapboxTilesetSourceLayer?: string;
+    /** Property name to match with data's location/pcode field */
+    mapboxTilesetIdField?: string;
+    /** Mapbox access token for tileset API calls */
+    mapboxAccessToken?: string;
+
     //usePredefinedColorRamp: boolean;
 
     invertColorRamp: boolean;
@@ -413,10 +427,24 @@ export interface ChoroplethOptions {
     classes: number;
     classificationMethod: ClassificationMethod;
 
+    // Category colors for unique classification
+    /** Array of 7 user-defined colors for unique value categories */
+    categoryColors?: string[];
+    /** Array of 7 user-defined values for unique value categories */
+    categoryValues?: string[];
+    /** Color for values beyond the top 7 categories */
+    othersColor?: string;
+
     strokeColor: string;
     strokeWidth: number;
     layerOpacity: number;
     simplificationStrength?: number;
+
+    // Feature color property support
+    /** Whether to use color property from feature properties */
+    useFeatureColor: boolean;
+    /** Property name to look for color values (default: "color") */
+    featureColorProperty: string;
 
     // Nested geometry styling (for GeometryCollections)
     showNestedPoints: boolean;

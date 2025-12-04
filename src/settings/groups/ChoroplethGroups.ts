@@ -22,7 +22,7 @@ import DropDown = formattingSettings.ItemDropdown;
 
 /**
  * Settings group for choropleth boundary data source configuration.
- * Handles both GeoBoundaries and custom TopoJSON/GeoJSON sources.
+ * Handles GeoBoundaries, custom TopoJSON/GeoJSON, and Mapbox Tileset sources.
  */
 export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.SimpleCard {
     boundaryDataSource: DropDown = new DropDown({
@@ -34,7 +34,8 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         },
         items: [
             { value: "geoboundaries", displayName: "GeoBoundaries" },
-            { value: "custom", displayName: "Custom" }
+            { value: "custom", displayName: "Custom" },
+            { value: "mapbox", displayName: "Mapbox Tileset" }
         ]
     });
 
@@ -133,6 +134,31 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         description: "If your TopoJSON has multiple objects, specify the object name to use. Leave blank to auto-detect the polygon layer."
     });
 
+    // Mapbox Tileset settings - direct v4 API access works with public tokens for public tilesets
+    mapboxTilesetId: TextInput = new TextInput({
+        name: "mapboxTilesetId",
+        displayName: "Tileset ID",
+        value: "",
+        placeholder: "e.g. ocha-rosea-1.rosea-ipc-combined-areas",
+        description: "The Mapbox tileset ID in format username.tileset-name. Public tilesets work with public tokens (pk.*). Find the ID in Mapbox Studio > Tilesets."
+    });
+
+    mapboxTilesetSourceLayer: TextInput = new TextInput({
+        name: "mapboxTilesetSourceLayer",
+        displayName: "Source Layer",
+        value: "",
+        placeholder: "e.g. ipc_areas",
+        description: "The vector layer name within the tileset. View the tileset's TileJSON to find available layer names."
+    });
+
+    mapboxTilesetIdField: TextInput = new TextInput({
+        name: "mapboxTilesetIdField",
+        displayName: "ID Field",
+        value: "",
+        placeholder: "e.g. iso_3166_1_alpha_3",
+        description: "The property name in the tileset features to match with your data's location/pcode field."
+    });
+
     name: string = "choroplethLocationBoundarySettingsGroup";
     displayName: string = "Boundary";
     collapsible: boolean = false;
@@ -145,7 +171,10 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         this.topoJSON_geoJSON_FileUrl,
         this.topojsonObjectName,
         this.boundaryIdField,
-        this.customBoundaryIdField
+        this.customBoundaryIdField,
+        this.mapboxTilesetId,
+        this.mapboxTilesetSourceLayer,
+        this.mapboxTilesetIdField
     ];
 
     public applyConditionalDisplayRules(): void {
@@ -223,9 +252,15 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         }
 
         const isCustomSource = selectedSource === "custom";
+        const isMapboxSource = selectedSource === "mapbox";
 
         this.topoJSON_geoJSON_FileUrl.visible = isCustomSource;
         this.topojsonObjectName.visible = isCustomSource;
+
+        // Mapbox Tileset settings visibility
+        this.mapboxTilesetId.visible = isMapboxSource;
+        this.mapboxTilesetSourceLayer.visible = isMapboxSource;
+        this.mapboxTilesetIdField.visible = isMapboxSource;
 
         const showGeoDropdown = selectedSource === "geoboundaries";
         const showCustomInput = selectedSource === "custom";
@@ -247,6 +282,12 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
             newSlices.push(this.topoJSON_geoJSON_FileUrl);
             newSlices.push(this.topojsonObjectName);
             newSlices.push(this.customBoundaryIdField);
+        }
+
+        if (isMapboxSource) {
+            newSlices.push(this.mapboxTilesetId);
+            newSlices.push(this.mapboxTilesetSourceLayer);
+            newSlices.push(this.mapboxTilesetIdField);
         }
 
         try { this.slices = newSlices; } catch (e) { }
@@ -399,6 +440,7 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
 
 /**
  * Settings group for choropleth classification method configuration.
+ * Includes category value + color assignments for unique value classification.
  */
 export class ChoroplethClassificationSettingsGroup extends formattingSettings.SimpleCard {
     numClasses: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
@@ -434,15 +476,124 @@ export class ChoroplethClassificationSettingsGroup extends formattingSettings.Si
         ]
     });
 
-    name: string = "choroplethClassificationSettingsGroup";
-    displayName: string = "Classification";
-    slices: formattingSettings.Slice[] = [this.classificationMethod, this.numClasses];
-}
+    // Class value + color assignments for unique value classification
+    // These are shown only when classification method is "Unique"
+    // Each class has a value input (auto-populated from data) and a color picker
+    
+    // Class 1
+    category1Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category1Value",
+        displayName: "Class 1",
+        description: "Value for class 1 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category1Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category1Color",
+        displayName: "    Color",
+        description: "Color for class 1",
+        value: { value: "#009edb" }
+    });
 
-/**
- * Settings group for choropleth display styling.
- */
-export class ChoroplethDisplaySettingsGroup extends formattingSettings.SimpleCard {
+    // Class 2
+    category2Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category2Value",
+        displayName: "Class 2",
+        description: "Value for class 2 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category2Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category2Color",
+        displayName: "    Color",
+        description: "Color for class 2",
+        value: { value: "#64beeb" }
+    });
+
+    // Class 3
+    category3Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category3Value",
+        displayName: "Class 3",
+        description: "Value for class 3 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category3Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category3Color",
+        displayName: "    Color",
+        description: "Color for class 3",
+        value: { value: "#c7e1f5" }
+    });
+
+    // Class 4
+    category4Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category4Value",
+        displayName: "Class 4",
+        description: "Value for class 4 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category4Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category4Color",
+        displayName: "    Color",
+        description: "Color for class 4",
+        value: { value: "#e1eef9" }
+    });
+
+    // Class 5
+    category5Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category5Value",
+        displayName: "Class 5",
+        description: "Value for class 5 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category5Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category5Color",
+        displayName: "    Color",
+        description: "Color for class 5",
+        value: { value: "#ffd966" }
+    });
+
+    // Class 6
+    category6Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category6Value",
+        displayName: "Class 6",
+        description: "Value for class 6 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category6Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category6Color",
+        displayName: "    Color",
+        description: "Color for class 6",
+        value: { value: "#f6b26b" }
+    });
+
+    // Class 7
+    category7Value: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "category7Value",
+        displayName: "Class 7",
+        description: "Value for class 7 (auto-detected from data or set manually)",
+        value: "",
+        placeholder: "(auto)"
+    });
+    category7Color: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "category7Color",
+        displayName: "    Color",
+        description: "Color for class 7",
+        value: { value: "#e06666" }
+    });
+
+    // Others color for overflow
+    othersColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "othersColor",
+        displayName: "Others Color",
+        description: "Color for class values beyond the configured classes",
+        value: { value: "#999999" }
+    });
+
+    // Display settings (merged from ChoroplethDisplaySettingsGroup)
     colorRamp: DropDown = new DropDown({
         name: "colorRamp",
         displayName: "Color Ramp",
@@ -544,22 +695,279 @@ export class ChoroplethDisplaySettingsGroup extends formattingSettings.SimpleCar
         }
     });
 
-    name: string = "choroplethDisplaySettingsGroup";
-    displayName: string = "Display";
+    useFeatureColor: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+        name: "useFeatureColor",
+        displayName: "Use Feature Color",
+        description: "When enabled, uses the color property from GeoJSON/TopoJSON feature properties if available",
+        value: false
+    });
+
+    featureColorProperty: formattingSettings.TextInput = new formattingSettings.TextInput({
+        name: "featureColorProperty",
+        displayName: "Color Property Name",
+        description: "The property name in feature properties that contains the color value (e.g., 'color', 'fill', 'style_color')",
+        value: "color",
+        placeholder: "color"
+    });
+
+    name: string = "choroplethClassificationSettingsGroup";
+    displayName: string = "Classification and Display";
     slices: formattingSettings.Slice[] = [
+        this.classificationMethod, 
+        this.numClasses,
+        // Class 1 - value and color
+        this.category1Value,
+        this.category1Color,
+        // Class 2 - value and color
+        this.category2Value,
+        this.category2Color,
+        // Class 3 - value and color
+        this.category3Value,
+        this.category3Color,
+        // Class 4 - value and color
+        this.category4Value,
+        this.category4Color,
+        // Class 5 - value and color
+        this.category5Value,
+        this.category5Color,
+        // Class 6 - value and color
+        this.category6Value,
+        this.category6Color,
+        // Class 7 - value and color
+        this.category7Value,
+        this.category7Color,
+        // Others
+        this.othersColor,
+        // Display settings (for non-unique classification)
         this.colorRamp,
         this.customColorRamp,
         this.invertColorRamp,
         this.colorMode,
+        // Common display settings
         this.strokeColor,
         this.strokeWidth,
         this.layerOpacity,
-        this.simplificationStrength
+        this.simplificationStrength,
+        this.useFeatureColor,
+        this.featureColorProperty
     ];
 
+    /**
+     * Cached class labels from data for dynamic display names.
+     * Set by the orchestrator when processing unique classification.
+     */
+    private _dataDetectedValues: string[] = [];
+
+    /**
+     * Stable master list of all unique values ever seen (persists across filtering).
+     * New values are added but existing values are never removed.
+     */
+    private _stableMasterValues: string[] = [];
+
+    /**
+     * Number of unique values detected in data (caps numClasses).
+     */
+    private _dataValueCount: number = 0;
+
+    /**
+     * Last measure query name - used to detect when measure changes.
+     */
+    private _lastMeasureQueryName: string | undefined;
+
+    /**
+     * Sets the class values detected from data.
+     * Maintains a stable master list - new values are added, existing values persist.
+     * @param values Array of unique values from data, sorted ascending
+     * @param count Total count of unique values in data
+     * @param measureQueryName Optional measure query name to detect measure changes
+     */
+    public setDataDetectedValues(values: string[], count: number, measureQueryName?: string): void {
+        // If measure changed, reset the stable list
+        if (measureQueryName && measureQueryName !== this._lastMeasureQueryName) {
+            this._stableMasterValues = [];
+            this._lastMeasureQueryName = measureQueryName;
+        }
+        
+        // Add any new values to the stable master list (preserving order)
+        for (const value of values) {
+            if (!this._stableMasterValues.includes(value)) {
+                this._stableMasterValues.push(value);
+            }
+        }
+        
+        // Limit to top 7 in the stable list
+        this._stableMasterValues = this._stableMasterValues.slice(0, 7);
+        
+        // Use the stable master list for display
+        this._dataDetectedValues = this._stableMasterValues;
+        this._dataValueCount = Math.max(count, this._stableMasterValues.length);
+        this.updateCategoryValuePlaceholders();
+    }
+
+    /**
+     * Resets the stable value tracking (call when measure changes).
+     */
+    public resetStableValues(): void {
+        this._stableMasterValues = [];
+        this._dataDetectedValues = [];
+        this._dataValueCount = 0;
+        this._lastMeasureQueryName = undefined;
+    }
+
+    /**
+     * Gets the number of unique values detected in data.
+     */
+    public getDataValueCount(): number {
+        return this._dataValueCount;
+    }
+
+    /**
+     * Updates class value input placeholders with detected values.
+     */
+    private updateCategoryValuePlaceholders(): void {
+        const valueInputs = [
+            this.category1Value,
+            this.category2Value,
+            this.category3Value,
+            this.category4Value,
+            this.category5Value,
+            this.category6Value,
+            this.category7Value
+        ];
+
+        for (let i = 0; i < 7; i++) {
+            if (i < this._dataDetectedValues.length) {
+                valueInputs[i].placeholder = this._dataDetectedValues[i];
+            } else {
+                valueInputs[i].placeholder = "(no data)";
+            }
+        }
+    }
+
+    /**
+     * Gets the effective class values (user-set or auto-detected).
+     * Returns array of values in order, with empty strings for unused slots.
+     */
+    public getEffectiveCategoryValues(): string[] {
+        const valueInputs = [
+            this.category1Value,
+            this.category2Value,
+            this.category3Value,
+            this.category4Value,
+            this.category5Value,
+            this.category6Value,
+            this.category7Value
+        ];
+
+        return valueInputs.map((input, i) => {
+            // Use user-set value if provided, otherwise use auto-detected
+            const userValue = input.value?.trim();
+            if (userValue && userValue.length > 0) {
+                return userValue;
+            }
+            return this._dataDetectedValues[i] || "";
+        });
+    }
+
+    /**
+     * Applies conditional display rules for classification settings.
+     * Class value+color pairs are always visible when classification method is Unique.
+     * This ensures users can pre-configure colors for values that may appear when filters change.
+     * Color ramp settings are only visible when classification method is NOT Unique.
+     */
     public applyConditionalDisplayRules(): void {
+        const isUnique = this.classificationMethod.value?.value === ClassificationMethods.Unique;
+        const requestedClasses = this.numClasses.value || 7;
+        
+        // All 7 class value+color pairs visible when using unique classification
+        // This allows users to set colors for values that may appear when filters change
+        this.category1Value.visible = isUnique && requestedClasses >= 1;
+        this.category1Color.visible = isUnique && requestedClasses >= 1;
+        
+        this.category2Value.visible = isUnique && requestedClasses >= 2;
+        this.category2Color.visible = isUnique && requestedClasses >= 2;
+        
+        this.category3Value.visible = isUnique && requestedClasses >= 3;
+        this.category3Color.visible = isUnique && requestedClasses >= 3;
+        
+        this.category4Value.visible = isUnique && requestedClasses >= 4;
+        this.category4Color.visible = isUnique && requestedClasses >= 4;
+        
+        this.category5Value.visible = isUnique && requestedClasses >= 5;
+        this.category5Color.visible = isUnique && requestedClasses >= 5;
+        
+        this.category6Value.visible = isUnique && requestedClasses >= 6;
+        this.category6Color.visible = isUnique && requestedClasses >= 6;
+        
+        this.category7Value.visible = isUnique && requestedClasses >= 7;
+        this.category7Color.visible = isUnique && requestedClasses >= 7;
+        
+        // Others color always visible for unique classification (for overflow values)
+        this.othersColor.visible = isUnique;
+
+        // Color ramp settings only visible when NOT using unique classification
+        this.colorRamp.visible = !isUnique;
+        this.invertColorRamp.visible = !isUnique;
+        this.colorMode.visible = !isUnique;
+        
+        // Custom color ramp only visible when color ramp is "custom" AND not unique classification
         const isCustomRamp = this.colorRamp.value?.value === "custom";
-        this.customColorRamp.visible = isCustomRamp;
+        this.customColorRamp.visible = !isUnique && isCustomRamp;
+        
+        // Show color property name only when feature color is enabled
+        this.featureColorProperty.visible = this.useFeatureColor.value === true;
+    }
+
+    /**
+     * Gets the array of class colors for unique classification.
+     * Returns colors in order from class 1 to 7.
+     */
+    public getCategoryColors(): string[] {
+        return [
+            this.category1Color.value?.value || "#009edb",
+            this.category2Color.value?.value || "#64beeb",
+            this.category3Color.value?.value || "#c7e1f5",
+            this.category4Color.value?.value || "#e1eef9",
+            this.category5Color.value?.value || "#ffd966",
+            this.category6Color.value?.value || "#f6b26b",
+            this.category7Color.value?.value || "#e06666"
+        ];
+    }
+
+    /**
+     * Gets a map of class value -> color for unique classification.
+     * Uses effective values (user-set or auto-detected).
+     */
+    public getCategoryValueColorMap(): Map<string, string> {
+        const values = this.getEffectiveCategoryValues();
+        const colors = this.getCategoryColors();
+        const map = new Map<string, string>();
+        
+        for (let i = 0; i < 7; i++) {
+            if (values[i] && values[i].length > 0) {
+                map.set(values[i], colors[i]);
+            }
+        }
+        
+        return map;
+    }
+
+    /**
+     * Gets the "others" color for values beyond configured classes.
+     */
+    public getOthersColor(): string {
+        return this.othersColor.value?.value || "#999999";
+    }
+
+    /**
+     * Gets the effective number of classes (capped to data count).
+     */
+    public getEffectiveClassCount(): number {
+        const requested = this.numClasses.value || 7;
+        if (this._dataValueCount > 0) {
+            return Math.min(requested, this._dataValueCount, 7);
+        }
+        return Math.min(requested, 7);
     }
 }
 

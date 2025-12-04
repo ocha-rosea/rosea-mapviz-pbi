@@ -21,7 +21,6 @@ export {
 export {
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
-    ChoroplethDisplaySettingsGroup,
     ChoroplethLegendSettingsGroup,
     ChoroplethNestedGeometrySettingsGroup
 } from "./ChoroplethGroups";

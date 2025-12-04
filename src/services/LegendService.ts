@@ -397,9 +397,40 @@ export class LegendService {
         if (options.classificationMethod === ClassificationMethods.Unique) {
             const uniqueValues = classBreaks;
             const maxLegendItems = Math.min(options.classes || 7, 7);
-            const colorPool = normalizedColorScale.slice(0, maxLegendItems);
-            while (colorPool.length < Math.min(uniqueValues.length, maxLegendItems)) {
-                colorPool.push("#000000");
+            
+            // Use categoryColors if available, otherwise use colorScale
+            const categoryColors = options.categoryColors;
+            const categoryValues = options.categoryValues;
+            
+            // Build a map from value -> color using categoryValues if defined
+            const valueToColorMap = new Map<string, string>();
+            if (categoryValues && categoryColors && Array.isArray(categoryValues) && Array.isArray(categoryColors)) {
+                for (let i = 0; i < Math.min(categoryValues.length, categoryColors.length, 7); i++) {
+                    const catValue = categoryValues[i]?.trim();
+                    if (catValue && catValue.length > 0) {
+                        valueToColorMap.set(catValue, categoryColors[i] || "#999999");
+                    }
+                }
+            }
+            
+            // Build color pool - if categoryValues are defined, use the mapping; otherwise use colorScale by index
+            const colorPool: string[] = [];
+            for (let i = 0; i < Math.min(uniqueValues.length, maxLegendItems); i++) {
+                const value = uniqueValues[i];
+                const valueStr = String(value).trim();
+                
+                // Check if this value has a user-defined color via categoryValues
+                if (valueToColorMap.has(valueStr)) {
+                    colorPool.push(valueToColorMap.get(valueStr)!);
+                } else if (categoryColors && i < categoryColors.length) {
+                    // Fall back to categoryColors by index (auto-detected values)
+                    colorPool.push(categoryColors[i]);
+                } else if (i < normalizedColorScale.length) {
+                    // Fall back to normalized color scale
+                    colorPool.push(normalizedColorScale[i]);
+                } else {
+                    colorPool.push("#000000");
+                }
             }
 
             for (let i = 0; i < Math.min(uniqueValues.length, maxLegendItems); i++) {
@@ -455,30 +486,34 @@ export class LegendService {
             return;
         }
 
-        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-        legendEntries.sort((a, b) => {
-            const aHasNumber = typeof a.sortKeyNumber === "number";
-            const bHasNumber = typeof b.sortKeyNumber === "number";
+        // For unique classification, maintain class order (1, 2, 3...); for other methods, sort by value
+        if (options.classificationMethod !== ClassificationMethods.Unique) {
+            const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+            legendEntries.sort((a, b) => {
+                const aHasNumber = typeof a.sortKeyNumber === "number";
+                const bHasNumber = typeof b.sortKeyNumber === "number";
 
-            if (aHasNumber && bHasNumber) {
-                const diff = (a.sortKeyNumber as number) - (b.sortKeyNumber as number);
-                if (diff !== 0) {
-                    return diff;
+                if (aHasNumber && bHasNumber) {
+                    const diff = (a.sortKeyNumber as number) - (b.sortKeyNumber as number);
+                    if (diff !== 0) {
+                        return diff;
+                    }
+                    if (typeof a.secondaryNumber === "number" && typeof b.secondaryNumber === "number") {
+                        return (a.secondaryNumber as number) - (b.secondaryNumber as number);
+                    }
+                    return 0;
                 }
-                if (typeof a.secondaryNumber === "number" && typeof b.secondaryNumber === "number") {
-                    return (a.secondaryNumber as number) - (b.secondaryNumber as number);
+
+                if (aHasNumber !== bHasNumber) {
+                    return aHasNumber ? -1 : 1;
                 }
-                return 0;
-            }
 
-            if (aHasNumber !== bHasNumber) {
-                return aHasNumber ? -1 : 1;
-            }
-
-            const aText = (a.sortKeyText ?? a.label ?? "").toString();
-            const bText = (b.sortKeyText ?? b.label ?? "").toString();
-            return collator.compare(aText, bText);
-        });
+                const aText = (a.sortKeyText ?? a.label ?? "").toString();
+                const bText = (b.sortKeyText ?? b.label ?? "").toString();
+                return collator.compare(aText, bText);
+            });
+        }
+        // For unique classification, legendEntries are already in class order (1, 2, 3...)
 
         // Calculate max width when needed
         let maxWidth = 0;

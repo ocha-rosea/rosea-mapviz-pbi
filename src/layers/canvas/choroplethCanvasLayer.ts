@@ -6,6 +6,7 @@ import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
 import { selectionOpacity } from '../../utils/graphics';
+import { getFeatureColor } from '../../utils/color';
 import type { Extent } from 'ol/extent.js';
 import { transformExtent } from 'ol/proj.js';
 
@@ -87,7 +88,16 @@ export class ChoroplethCanvasLayer extends Layer {
     for (const feature of this.geojson.features as GeoJSONFeature[]) {
       const pCode = feature.properties[this.options.dataKey];
       const value = this.valueLookup[pCode];
-  const fill = (pCode === undefined || isNoDataValue(value)) ? NO_DATA_COLOR : this.options.colorScale(value);
+      
+      // Check for feature-level color override (only if enabled)
+      // This color applies to ALL geometries in this feature (including GeometryCollection)
+      const featureColor = this.options.useFeatureColor
+          ? getFeatureColor(feature.properties, this.options.featureColorProperty)
+          : null;
+      
+      // Determine fill color - priority: 1. Feature color, 2. Color scale, 3. NO_DATA_COLOR
+      const fill = featureColor 
+          ?? ((pCode === undefined || isNoDataValue(value)) ? NO_DATA_COLOR : this.options.colorScale(value));
       const dp = this.options.dataPoints?.find(d => d.pcode === pCode);
       const alpha = selectionOpacity(this.selectedIds, dp?.selectionId as any, this.options.fillOpacity);
       drawPolygon(ctx, feature, project, fill, this.options.strokeColor, this.options.strokeWidth, alpha, nestedStyle);
