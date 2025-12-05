@@ -93,8 +93,10 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
     private contextMenuHandler: ((event: MouseEvent) => void) | null = null;
     private colorScaleFn: (value: number | null | undefined) => string;
     private hasFittedExtent: boolean = false;
+    private lastFittedExtent: [number, number, number, number] | null = null;
     private lastTooltipTime: number = 0;
     private readonly TOOLTIP_THROTTLE_MS = 50; // Throttle tooltip updates
+    private readonly EXTENT_CHANGE_THRESHOLD = 0.05; // 5% change threshold
 
     /**
      * Builds the tile URL from a Mapbox style URL or tileset ID.
@@ -254,30 +256,256 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
     }
 
     /**
-     * Sets up fit-to-extent behavior using Mapbox TileJSON API.
-     * Fetches tileset bounds and fits the map view to them.
+     * Sets up fit-to-extent behavior.
+     * 
+     * Fetches tileset bounds to trigger tile loading, waits for tiles
+     * to load, then fits to the extent of filtered data.
      */
     private setupFitToExtent(map: OLMap): void {
         if (this.hasFittedExtent) return;
         
-        // Fetch tileset bounds from TileJSON API
+        const source = this.getSource();
+        if (!source) return;
+        
+        // Fetch tileset bounds to set initial view and trigger tile loading
         this.fetchTilesetBounds().then(bounds => {
-            if (!bounds || this.hasFittedExtent) return;
+            if (this.hasFittedExtent) return;
             
-            const [west, south, east, north] = bounds;
+            if (bounds) {
+                const [west, south, east, north] = bounds;
+                const minCoord = fromLonLat([west, south]);
+                const maxCoord = fromLonLat([east, north]);
+                const tilesetExtent = [minCoord[0], minCoord[1], maxCoord[0], maxCoord[1]];
+                
+                // Set view to tileset bounds to trigger tile loading (no animation)
+                map.getView().fit(tilesetExtent, {
+                    duration: 0,
+                    padding: [50, 50, 50, 50]
+                });
+            }
             
-            // Transform from EPSG:4326 (WGS84) to map projection (typically EPSG:3857)
-            const minCoord = fromLonLat([west, south]);
-            const maxCoord = fromLonLat([east, north]);
-            
-            const extent = [minCoord[0], minCoord[1], maxCoord[0], maxCoord[1]];
-            
-            this.hasFittedExtent = true;
-            map.getView().fit(extent, {
-                duration: 300,
-                padding: [50, 50, 50, 50]
-            });
+            // Wait for tiles to load then fit to filtered extent
+            this.waitForTilesAndFit(map);
         });
+    }
+    
+    /**
+     * Waits for tiles to finish loading, then fits to filtered data extent.
+     */
+    private waitForTilesAndFit(map: OLMap): void {
+        const source = this.getSource();
+        if (!source || this.hasFittedExtent) return;
+        
+        let loadingCount = 0;
+        let checkScheduled = false;
+        
+        const doFit = () => {
+            if (this.hasFittedExtent) return;
+            
+            const extent = this.calculateFilteredExtent();
+            if (extent) {
+                this.fitToExtentIfChanged(map, extent);
+            }
+        };
+        
+        const scheduleCheck = () => {
+            if (checkScheduled) return;
+            checkScheduled = true;
+            // Small delay to batch multiple tile loads
+            setTimeout(() => {
+                checkScheduled = false;
+                if (loadingCount === 0 && !this.hasFittedExtent) {
+                    doFit();
+                }
+            }, 100);
+        };
+        
+        const onTileLoadStart = () => {
+            loadingCount++;
+        };
+        
+        const onTileLoadEnd = () => {
+            loadingCount = Math.max(0, loadingCount - 1);
+            scheduleCheck();
+        };
+        
+        const onTileLoadError = () => {
+            loadingCount = Math.max(0, loadingCount - 1);
+            scheduleCheck();
+        };
+        
+        source.on('tileloadstart', onTileLoadStart);
+        source.on('tileloadend', onTileLoadEnd);
+        source.on('tileloaderror', onTileLoadError);
+        
+        // Cleanup after fit or timeout
+        const cleanup = () => {
+            source.un('tileloadstart', onTileLoadStart);
+            source.un('tileloadend', onTileLoadEnd);
+            source.un('tileloaderror', onTileLoadError);
+        };
+        
+        // Try immediately in case tiles are cached
+        setTimeout(() => {
+            if (!this.hasFittedExtent) {
+                doFit();
+            }
+            if (this.hasFittedExtent) {
+                cleanup();
+            }
+        }, 200);
+        
+        // Final timeout - cleanup listeners
+        setTimeout(() => {
+            cleanup();
+            if (!this.hasFittedExtent) {
+                doFit();
+                this.hasFittedExtent = true; // Mark as done even if no extent found
+            }
+        }, 2000);
+    }
+    
+    /**
+     * Calculates the bounding extent from loaded features that match the filtered data.
+     * Only considers features whose ID is in the valueLookup (i.e., filtered data).
+     * 
+     * @returns The extent [minX, minY, maxX, maxY] or null if no features found
+     */
+    private calculateFilteredExtent(): [number, number, number, number] | null {
+        const source = this.getSource();
+        if (!source) return null;
+        
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        let foundAny = false;
+        
+        const map = this.attachedMap;
+        if (!map) return null;
+        
+        const view = map.getView();
+        const resolution = view.getResolution();
+        if (!resolution) return null;
+        
+        try {
+            // For VectorTileLayer, use getFeaturesInExtent on the LAYER (not source)
+            // Use a very large extent to get ALL loaded features, not just visible ones
+            // This ensures we calculate extent from all data, not just what's in view
+            const worldExtent = [-20037508.34, -20037508.34, 20037508.34, 20037508.34]; // Web Mercator world bounds
+            const renderedFeatures = this.getFeaturesInExtent(worldExtent);
+            
+            for (const feature of renderedFeatures) {
+                // Check if feature ID matches our data (filtered or not)
+                const id = feature.get(this.options.idField);
+                if (id === undefined || id === null) continue;
+                
+                const idStr = String(id);
+                if (!this.valueLookup.has(idStr)) continue;
+                
+                // Feature is in our data - include in extent
+                const geometry = feature.getGeometry();
+                if (!geometry) continue;
+                
+                const featureExtent = geometry.getExtent();
+                if (featureExtent && featureExtent.length === 4) {
+                    if (isFinite(featureExtent[0]) && isFinite(featureExtent[1]) && 
+                        isFinite(featureExtent[2]) && isFinite(featureExtent[3])) {
+                        minX = Math.min(minX, featureExtent[0]);
+                        minY = Math.min(minY, featureExtent[1]);
+                        maxX = Math.max(maxX, featureExtent[2]);
+                        maxY = Math.max(maxY, featureExtent[3]);
+                        foundAny = true;
+                    }
+                }
+            }
+        } catch (err) {
+            // If getting features fails, fall back to no extent
+            console.warn('[ChoroplethVectorTileLayer] Error calculating filtered extent:', err);
+        }
+        
+        if (!foundAny) return null;
+        
+        // Validate extent
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+            return null;
+        }
+        
+        // Check for degenerate extent (point or line)
+        if (minX === maxX) {
+            minX -= 1000;
+            maxX += 1000;
+        }
+        if (minY === maxY) {
+            minY -= 1000;
+            maxY += 1000;
+        }
+        
+        return [minX, minY, maxX, maxY];
+    }
+    
+    /**
+     * Checks if two extents are similar enough to skip re-fitting.
+     * Returns true if the change is minimal (within threshold).
+     */
+    private extentsAreSimilar(
+        extent1: [number, number, number, number] | null,
+        extent2: [number, number, number, number] | null
+    ): boolean {
+        if (!extent1 || !extent2) return false;
+        
+        const width1 = extent1[2] - extent1[0];
+        const height1 = extent1[3] - extent1[1];
+        const width2 = extent2[2] - extent2[0];
+        const height2 = extent2[3] - extent2[1];
+        
+        // Calculate size of each extent
+        const size1 = width1 * height1;
+        const size2 = width2 * height2;
+        
+        if (size1 === 0 || size2 === 0) return false;
+        
+        // Check if size change is within threshold
+        const sizeRatio = Math.abs(size1 - size2) / Math.max(size1, size2);
+        if (sizeRatio > this.EXTENT_CHANGE_THRESHOLD) return false;
+        
+        // Check if center moved significantly relative to extent size
+        const center1X = (extent1[0] + extent1[2]) / 2;
+        const center1Y = (extent1[1] + extent1[3]) / 2;
+        const center2X = (extent2[0] + extent2[2]) / 2;
+        const center2Y = (extent2[1] + extent2[3]) / 2;
+        
+        const avgWidth = (width1 + width2) / 2;
+        const avgHeight = (height1 + height2) / 2;
+        
+        const centerShiftX = Math.abs(center1X - center2X) / avgWidth;
+        const centerShiftY = Math.abs(center1Y - center2Y) / avgHeight;
+        
+        if (centerShiftX > this.EXTENT_CHANGE_THRESHOLD || centerShiftY > this.EXTENT_CHANGE_THRESHOLD) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Fits the map to the given extent, but only if it differs significantly
+     * from the last fitted extent.
+     */
+    private fitToExtentIfChanged(map: OLMap, extent: [number, number, number, number]): boolean {
+        // Skip if extent is similar to last fitted extent
+        if (this.extentsAreSimilar(extent, this.lastFittedExtent)) {
+            return false;
+        }
+        
+        this.lastFittedExtent = extent;
+        this.hasFittedExtent = true;
+        
+        map.getView().fit(extent, {
+            duration: 0,
+            padding: [50, 50, 50, 50],
+            maxZoom: 18
+        });
+        
+        return true;
     }
 
     /**
@@ -453,12 +681,15 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
 
     /**
      * Updates the data points and refreshes lookups.
+     * Triggers a re-fit to extent when data changes significantly.
      */
     public updateData(
         categoryValues: string[],
         measureValues: Array<number | null | undefined>,
         dataPoints: ChoroplethDataPoint[]
     ): void {
+        const previousCount = this.valueLookup.size;
+        
         this.valueLookup.clear();
         this.tooltipLookup.clear();
         this.selectionIdLookup.clear();
@@ -472,6 +703,43 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
             this.selectionIdLookup.set(dp.pcode, dp.selectionId);
         }
 
+        this.changed();
+        
+        // If data count changed significantly, re-fit to extent
+        const newCount = this.valueLookup.size;
+        if (previousCount !== newCount && this.attachedMap) {
+            this.refitToExtent();
+        }
+    }
+    
+    /**
+     * Triggers a re-fit to the data extent.
+     * Call this after data updates to zoom to the new extent.
+     * Only fits if the new extent differs significantly from the current extent.
+     */
+    public refitToExtent(): void {
+        if (!this.attachedMap) return;
+        
+        const map = this.attachedMap;
+        
+        // Try immediately - tiles should already be loaded
+        const extent = this.calculateFilteredExtent();
+        if (extent) {
+            // Only fit if extent changed significantly
+            this.fitToExtentIfChanged(map, extent);
+        } else {
+            // If no extent found, reset and wait for tiles
+            this.hasFittedExtent = false;
+            this.waitForTilesAndFit(map);
+        }
+    }
+    
+    /**
+     * Sets the selected IDs for highlighting.
+     * Pass empty array to clear selection.
+     */
+    public setSelectedIds(ids: ISelectionId[]): void {
+        this.selectedIds = ids || [];
         this.changed();
     }
 
