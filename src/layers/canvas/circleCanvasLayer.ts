@@ -8,7 +8,7 @@ import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
 import { selectionOpacity } from '../../utils/graphics';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
-import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType } from '../../utils/h3Aggregation';
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions } from '../../utils/h3Aggregation';
 
 export class CircleCanvasLayer extends Layer {
   public options: CircleLayerOptions;
@@ -44,15 +44,23 @@ export class CircleCanvasLayer extends Layer {
   const isHotspot = circleOptions.chartType === 'hotspot';
   const hotspotRadius = circleOptions.hotspotRadius || 20;
   const hotspotIntensity = circleOptions.hotspotIntensity || 1;
+  const hotspotColor = circleOptions.hotspotColor || circleOptions.color1;
+  const hotspotGlowColor = circleOptions.hotspotGlowColor || hotspotColor;
+  const hotspotBlurAmount = circleOptions.hotspotBlurAmount || 15;
+  const hotspotMinOpacity = (circleOptions.hotspotMinOpacity || 40) / 100;
+  const hotspotMaxOpacity = (circleOptions.hotspotMaxOpacity || 95) / 100;
+  const hotspotScaleByValue = circleOptions.hotspotScaleByValue !== false;
 
   // Apply blur/glow effects using canvas shadow
   let { enableBlur = false, blurRadius = 5, enableGlow = false, glowColor = '#FFFFFF', glowIntensity = 10 } = circleOptions;
   
-  // Hotspot mode: auto-enable glow
+  // Hotspot mode: auto-enable glow with dedicated settings
   if (isHotspot) {
     enableGlow = true;
+    enableBlur = true;
     glowIntensity = hotspotIntensity * 15;
-    glowColor = circleOptions.glowColor || circleOptions.color1;
+    glowColor = hotspotGlowColor;
+    blurRadius = hotspotBlurAmount;
   }
 
   // Check for H3 hexbin mode
@@ -101,8 +109,20 @@ export class CircleCanvasLayer extends Layer {
 
   for (let i = 0; i < longitudes.length; i++) {
       const [x, y] = project(longitudes[i], latitudes[i]);
-      // For hotspot, use fixed radius; otherwise use scaled radius
-      const r1 = isHotspot ? hotspotRadius : (circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : circleOptions.minRadius);
+      
+      // Calculate radius based on mode
+      let r1: number;
+      if (isHotspot) {
+        if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
+          // Scale hotspot size based on data value (between 0.3x and 1.5x base radius)
+          const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+          r1 = hotspotRadius * (0.3 + normalized * 1.2);
+        } else {
+          r1 = hotspotRadius;
+        }
+      } else {
+        r1 = circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : circleOptions.minRadius;
+      }
       const r2 = circle2SizeValues[i] !== undefined ? circleScale(circle2SizeValues[i]) : circleOptions.minRadius;
 
       const chartType = circleOptions.chartType;
@@ -112,8 +132,13 @@ export class CircleCanvasLayer extends Layer {
         ctx.beginPath();
         ctx.arc(x, y, r1, 0, 2*Math.PI);
         const selId = this.options.dataPoints?.[i]?.selectionId as any;
-        const opacity = Math.min(1, hotspotIntensity * 0.7);
-        ctx.fillStyle = applyOpacity(circleOptions.color1, selectionOpacity(this.selectedIds, selId, opacity));
+        // Calculate opacity based on value and min/max settings
+        let opacity = hotspotMaxOpacity;
+        if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
+          const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+          opacity = hotspotMinOpacity + normalized * (hotspotMaxOpacity - hotspotMinOpacity);
+        }
+        ctx.fillStyle = applyOpacity(hotspotColor, selectionOpacity(this.selectedIds, selId, opacity));
         ctx.fill();
         // No stroke for hotspots
 
@@ -470,7 +495,16 @@ export class CircleCanvasLayer extends Layer {
     height: number
   ): void {
     const { longitudes = [], latitudes = [], circle1SizeValues = [], circleOptions } = this.options;
-    const { h3Resolution = 4, h3AggregationType = 'sum', color1, layer1Opacity, strokeColor, strokeWidth } = circleOptions;
+    const { 
+      h3Resolution = 4, 
+      h3AggregationType = 'sum',
+      h3ColorRamp = 'viridis',
+      h3FillColor = '#3182bd',
+      h3StrokeColor = '#ffffff',
+      h3StrokeWidth = 1,
+      h3MinOpacity = 30,
+      h3MaxOpacity = 90
+    } = circleOptions;
 
     // Create D3 projection for coordinate conversion
     const d3Projection = createWebMercatorProjection(frameState, width, height);
@@ -497,6 +531,14 @@ export class CircleCanvasLayer extends Layer {
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
+    // Prepare color options
+    const colorOptions: H3ColorOptions = {
+      colorRamp: h3ColorRamp as H3ColorRamp,
+      customColor: h3FillColor,
+      minOpacity: h3MinOpacity,
+      maxOpacity: h3MaxOpacity
+    };
+
     // Remove previous hit overlay
     this.options.svg.select('#circles-hitlayer').remove();
     const hitLayer = this.options.svg.append('g').attr('id', 'circles-hitlayer');
@@ -522,15 +564,15 @@ export class CircleCanvasLayer extends Layer {
       });
       ctx.closePath();
 
-      // Get color based on value
-      const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, color1);
+      // Get color based on value using color ramp (includes opacity)
+      const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, colorOptions);
       ctx.fillStyle = fillColor;
-      ctx.globalAlpha = layer1Opacity;
+      ctx.globalAlpha = 1; // Opacity is already in fillColor
       ctx.fill();
 
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = strokeWidth;
+      ctx.strokeStyle = h3StrokeColor;
+      ctx.lineWidth = h3StrokeWidth;
       ctx.stroke();
 
       // Create invisible SVG hit target for tooltip/selection

@@ -384,6 +384,44 @@
             "enumeration": []
           }
         },
+        "h3ColorRamp": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "h3FillColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "h3StrokeColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "h3StrokeWidth": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "h3MinOpacity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "h3MaxOpacity": {
+          "type": {
+            "numeric": true
+          }
+        },
         "hotspotIntensity": {
           "type": {
             "numeric": true
@@ -392,6 +430,44 @@
         "hotspotRadius": {
           "type": {
             "numeric": true
+          }
+        },
+        "hotspotColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "hotspotGlowColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "hotspotBlurAmount": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "hotspotMinOpacity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "hotspotMaxOpacity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "hotspotScaleByValue": {
+          "type": {
+            "bool": true
           }
         },
         "showLegend": {

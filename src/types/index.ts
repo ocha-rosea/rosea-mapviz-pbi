@@ -401,9 +401,21 @@ export interface CircleOptions {
     // H3 Hexbin settings
     h3Resolution: number;
     h3AggregationType: string; // "sum" | "count" | "average" | "min" | "max"
+    h3ColorRamp: string; // "viridis" | "plasma" | "inferno" | "magma" | "warm" | "cool" | "blues" | "greens" | "reds" | "oranges" | "custom"
+    h3FillColor: string; // Custom fill color when h3ColorRamp is "custom"
+    h3StrokeColor: string;
+    h3StrokeWidth: number;
+    h3MinOpacity: number; // 0-100
+    h3MaxOpacity: number; // 0-100
     // Hotspot settings
     hotspotIntensity: number;
     hotspotRadius: number;
+    hotspotColor: string;
+    hotspotGlowColor: string;
+    hotspotBlurAmount: number;
+    hotspotMinOpacity: number; // 0-100
+    hotspotMaxOpacity: number; // 0-100
+    hotspotScaleByValue: boolean;
 }
 
 /**

@@ -124,10 +124,24 @@ export class OptionsService {
             enableGlow: circleSettings.proportionalCirclesDisplaySettingsGroup.enableGlow.value,
             glowColor: circleSettings.proportionalCirclesDisplaySettingsGroup.glowColor.value?.value || '',
             glowIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.glowIntensity.value,
+            // H3 Hexbin settings
             h3Resolution: circleSettings.proportionalCirclesDisplaySettingsGroup.h3Resolution.value,
             h3AggregationType: circleSettings.proportionalCirclesDisplaySettingsGroup.h3AggregationType.value.value.toString(),
+            h3ColorRamp: circleSettings.proportionalCirclesDisplaySettingsGroup.h3ColorRamp.value.value.toString(),
+            h3FillColor: circleSettings.proportionalCirclesDisplaySettingsGroup.h3FillColor.value?.value || '#3182bd',
+            h3StrokeColor: circleSettings.proportionalCirclesDisplaySettingsGroup.h3StrokeColor.value?.value || '#ffffff',
+            h3StrokeWidth: circleSettings.proportionalCirclesDisplaySettingsGroup.h3StrokeWidth.value,
+            h3MinOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.h3MinOpacity.value,
+            h3MaxOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.h3MaxOpacity.value,
+            // Hotspot settings
             hotspotIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotIntensity.value,
-            hotspotRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotRadius.value
+            hotspotRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotRadius.value,
+            hotspotColor: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotColor.value?.value || '#ff6600',
+            hotspotGlowColor: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotGlowColor.value?.value || '#ffcc00',
+            hotspotBlurAmount: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotBlurAmount.value,
+            hotspotMinOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotMinOpacity.value,
+            hotspotMaxOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotMaxOpacity.value,
+            hotspotScaleByValue: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotScaleByValue.value
         };
     }
 

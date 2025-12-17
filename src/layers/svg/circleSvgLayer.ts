@@ -8,7 +8,7 @@ import { CircleLayerOptions, GeoJSONFeature, CircleLabelOptions } from '../../ty
 import { DomIds } from "../../constants/strings";
 import { createWebMercatorProjection } from "../../utils/map";
 import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
-import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType } from "../../utils/h3Aggregation";
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions } from "../../utils/h3Aggregation";
 
 /**
  * SVG-based circle layer for rendering proportional symbols and pie/donut charts.
@@ -69,7 +69,8 @@ export class CircleSvgLayer extends Layer {
     const d3Projection = createWebMercatorProjection(frameState, width, height);
 
         const { combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
-        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity, hotspotIntensity, hotspotRadius } = circleOptions;
+        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity,
+              hotspotIntensity, hotspotRadius, hotspotColor, hotspotGlowColor, hotspotBlurAmount, hotspotMinOpacity, hotspotMaxOpacity, hotspotScaleByValue } = circleOptions;
 
         // High contrast mode: override colors with system colors
         if (this.options.isHighContrast && this.options.highContrastColors) {
@@ -80,16 +81,23 @@ export class CircleSvgLayer extends Layer {
             strokeWidth = Math.max(2, strokeWidth); // Minimum 2px stroke in HC mode
         }
 
-        // Hotspot mode: auto-enable glow and use hotspot-specific settings
+        // Hotspot mode: use hotspot-specific settings
         const isHotspot = chartType === 'hotspot';
         const isH3Hexbin = chartType === 'h3-hexbin';
         
         if (isHotspot) {
             enableGlow = true;
+            enableBlur = true;
+            // Use dedicated hotspot colors
+            color1 = hotspotColor || color1;
+            glowColor = hotspotGlowColor || hotspotColor || color1;
             glowIntensity = (hotspotIntensity || 1) * 15; // Scale intensity for glow
-            glowColor = glowColor || color1;
+            blurRadius = hotspotBlurAmount || 15;
             strokeWidth = 0; // No stroke for hotspots
-            layer1Opacity = Math.min(1, (hotspotIntensity || 1) * 0.7); // Adjust opacity based on intensity
+            // Calculate opacity based on min/max settings
+            const minOp = (hotspotMinOpacity || 40) / 100;
+            const maxOp = (hotspotMaxOpacity || 95) / 100;
+            layer1Opacity = Math.min(maxOp, minOp + (hotspotIntensity || 1) * (maxOp - minOp) / 10);
         }
 
         // H3 Hexbin mode: aggregate points and render hexagons
@@ -186,9 +194,21 @@ export class CircleSvgLayer extends Layer {
 
             if (projected) {
                 const [x, y] = projected;
-                // For hotspot, use hotspotRadius directly; otherwise use scaled radius
-                const hotspotR = hotspotRadius || 20;
-                const radius1 = isHotspot ? hotspotR : (circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : minRadius);
+                
+                // Calculate radius based on mode
+                let radius1: number;
+                if (isHotspot) {
+                    const baseHotspotR = hotspotRadius || 20;
+                    if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
+                        // Scale hotspot size based on data value (between 0.3x and 1.5x base radius)
+                        const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+                        radius1 = baseHotspotR * (0.3 + normalized * 1.2);
+                    } else {
+                        radius1 = baseHotspotR;
+                    }
+                } else {
+                    radius1 = circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : minRadius;
+                }
                 const radius2 = circle2SizeValues[i] !== undefined ? circleScale(circle2SizeValues[i]) : minRadius;
 
                 // Store position for label rendering
@@ -738,7 +758,16 @@ export class CircleSvgLayer extends Layer {
         height: number
     ): void {
         const { longitudes = [], latitudes = [], circle1SizeValues = [], circleOptions } = this.options;
-        const { h3Resolution = 4, h3AggregationType = 'sum', color1, layer1Opacity, strokeColor, strokeWidth } = circleOptions;
+        const { 
+            h3Resolution = 4, 
+            h3AggregationType = 'sum', 
+            h3ColorRamp = 'viridis',
+            h3FillColor = '#3182bd',
+            h3StrokeColor = '#ffffff',
+            h3StrokeWidth = 1,
+            h3MinOpacity = 30,
+            h3MaxOpacity = 90
+        } = circleOptions;
 
         // Remove existing hexbin group
         this.svg.select('#h3-hexbins-group').remove();
@@ -762,6 +791,14 @@ export class CircleSvgLayer extends Layer {
         const minValue = Math.min(...values);
         const maxValue = Math.max(...values);
 
+        // Prepare color options
+        const colorOptions: H3ColorOptions = {
+            colorRamp: h3ColorRamp as H3ColorRamp,
+            customColor: h3FillColor,
+            minOpacity: h3MinOpacity,
+            maxOpacity: h3MaxOpacity
+        };
+
         // Render each hexbin as a polygon
         hexbins.forEach((hexbin: H3Hexbin) => {
             // Convert boundary from [lat, lng] to [lng, lat] and project
@@ -776,16 +813,15 @@ export class CircleSvgLayer extends Layer {
                 .map((p, i) => `${i === 0 ? 'M' : 'L'}${p![0]},${p![1]}`)
                 .join(' ') + ' Z';
 
-            // Get color based on value
-            const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, color1);
+            // Get color based on value using color ramp
+            const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, colorOptions);
 
             // Create hexbin polygon
             const hexPath = hexbinGroup.append('path')
                 .attr('d', pathData)
                 .attr('fill', fillColor)
-                .attr('stroke', strokeColor)
-                .attr('stroke-width', strokeWidth)
-                .attr('fill-opacity', layer1Opacity)
+                .attr('stroke', h3StrokeColor)
+                .attr('stroke-width', h3StrokeWidth)
                 .style('cursor', 'pointer')
                 .style('pointer-events', 'all');
 

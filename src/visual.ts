@@ -279,7 +279,7 @@ export class RoseaMapViz implements IVisual {
             // Detect if Circle 2 data is present for conditional settings visibility
             const circleSizeValues = categorical?.values?.filter(c => c.source?.roles?.[RoleNames.Size]) || [];
             const hasCircle2Data = circleSizeValues.length >= 2;
-            const circleDisplayGroup = this.visualFormattingSettingsModel.proportionalCirclesVisualCardSettings.proportionalCirclesDisplaySettingsGroup;
+            const circleDisplayGroup = this.visualFormattingSettingsModel.ProportionalCirclesVisualCardSettings.proportionalCirclesDisplaySettingsGroup;
             circleDisplayGroup.setCircle2DataAvailable(hasCircle2Data);
             circleDisplayGroup.applyConditionalDisplayRules();
 

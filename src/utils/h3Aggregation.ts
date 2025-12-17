@@ -13,6 +13,22 @@ import { latLngToCell, cellToBoundary, cellToLatLng } from 'h3-js';
 export type H3AggregationType = 'sum' | 'count' | 'average' | 'min' | 'max';
 
 /**
+ * Color ramp types for hexbin visualization
+ */
+export type H3ColorRamp = 'viridis' | 'plasma' | 'inferno' | 'magma' | 'warm' | 'cool' | 
+                          'blues' | 'greens' | 'reds' | 'oranges' | 'custom';
+
+/**
+ * Options for hexbin color calculation
+ */
+export interface H3ColorOptions {
+    colorRamp: H3ColorRamp;
+    customColor?: string;
+    minOpacity: number; // 0-100
+    maxOpacity: number; // 0-100
+}
+
+/**
  * A single hexbin with its H3 index, boundary, center, and aggregated value
  */
 export interface H3Hexbin {
@@ -137,34 +153,175 @@ function aggregateValues(values: number[], type: H3AggregationType): number {
 }
 
 /**
- * Get color based on value using a color scale
+ * Color ramp definitions with RGB values at different stops
+ * Each ramp has colors from low (index 0) to high (index 4)
+ */
+const COLOR_RAMPS: Record<Exclude<H3ColorRamp, 'custom'>, [number, number, number][]> = {
+    viridis: [
+        [68, 1, 84],      // Dark purple
+        [59, 82, 139],    // Blue
+        [33, 145, 140],   // Teal
+        [94, 201, 98],    // Green
+        [253, 231, 37]    // Yellow
+    ],
+    plasma: [
+        [13, 8, 135],     // Dark blue
+        [126, 3, 168],    // Purple
+        [204, 71, 120],   // Pink
+        [248, 149, 64],   // Orange
+        [240, 249, 33]    // Yellow
+    ],
+    inferno: [
+        [0, 0, 4],        // Black
+        [87, 16, 110],    // Dark purple
+        [188, 55, 84],    // Red
+        [249, 142, 9],    // Orange
+        [252, 255, 164]   // Light yellow
+    ],
+    magma: [
+        [0, 0, 4],        // Black
+        [81, 18, 124],    // Purple
+        [183, 54, 121],   // Magenta
+        [252, 135, 97],   // Peach
+        [252, 253, 191]   // Light cream
+    ],
+    warm: [
+        [110, 64, 170],   // Purple
+        [191, 60, 175],   // Pink
+        [254, 75, 131],   // Red-pink
+        [255, 120, 71],   // Orange
+        [226, 183, 47]    // Yellow
+    ],
+    cool: [
+        [110, 64, 170],   // Purple
+        [75, 107, 169],   // Blue
+        [69, 165, 181],   // Teal
+        [97, 199, 150],   // Green
+        [226, 183, 47]    // Yellow
+    ],
+    blues: [
+        [247, 251, 255],  // Very light blue
+        [198, 219, 239],  // Light blue
+        [107, 174, 214],  // Medium blue
+        [33, 113, 181],   // Blue
+        [8, 48, 107]      // Dark blue
+    ],
+    greens: [
+        [247, 252, 245],  // Very light green
+        [199, 233, 192],  // Light green
+        [116, 196, 118],  // Medium green
+        [35, 139, 69],    // Green
+        [0, 68, 27]       // Dark green
+    ],
+    reds: [
+        [255, 245, 240],  // Very light red
+        [252, 187, 161],  // Light red
+        [251, 106, 74],   // Medium red
+        [203, 24, 29],    // Red
+        [103, 0, 13]      // Dark red
+    ],
+    oranges: [
+        [255, 245, 235],  // Very light orange
+        [253, 208, 162],  // Light orange
+        [253, 141, 60],   // Medium orange
+        [217, 72, 1],     // Orange
+        [127, 39, 4]      // Dark orange
+    ]
+};
+
+/**
+ * Interpolate between colors in a color ramp
+ */
+function interpolateColor(ramp: [number, number, number][], t: number): [number, number, number] {
+    // Clamp t to 0-1
+    t = Math.max(0, Math.min(1, t));
+    
+    // Find the two colors to interpolate between
+    const numStops = ramp.length;
+    const scaledT = t * (numStops - 1);
+    const lowerIndex = Math.floor(scaledT);
+    const upperIndex = Math.min(lowerIndex + 1, numStops - 1);
+    const localT = scaledT - lowerIndex;
+    
+    const lowerColor = ramp[lowerIndex];
+    const upperColor = ramp[upperIndex];
+    
+    return [
+        Math.round(lowerColor[0] + (upperColor[0] - lowerColor[0]) * localT),
+        Math.round(lowerColor[1] + (upperColor[1] - lowerColor[1]) * localT),
+        Math.round(lowerColor[2] + (upperColor[2] - lowerColor[2]) * localT)
+    ];
+}
+
+/**
+ * Get color based on value using a color ramp with configurable opacity
  * 
  * @param value - The value to map to a color
  * @param minValue - Minimum value in the dataset
  * @param maxValue - Maximum value in the dataset
- * @param baseColor - Base color for the scale (hex format)
+ * @param options - Color options including ramp type, custom color, and opacity range
  * @returns RGBA color string
  */
 export function getHexbinColor(
     value: number,
     minValue: number,
     maxValue: number,
-    baseColor: string
+    options: H3ColorOptions
+): string {
+    const { colorRamp, customColor, minOpacity, maxOpacity } = options;
+    
+    // Normalize value to 0-1 range
+    const range = maxValue - minValue;
+    const normalized = range > 0 ? (value - minValue) / range : 0.5;
+    
+    // Calculate opacity (convert from 0-100 to 0-1)
+    const opacity = (minOpacity / 100) + normalized * ((maxOpacity - minOpacity) / 100);
+    
+    let r: number, g: number, b: number;
+    
+    if (colorRamp === 'custom' && customColor) {
+        // Use custom color with opacity variation
+        const hex = customColor.replace('#', '');
+        r = parseInt(hex.substring(0, 2), 16);
+        g = parseInt(hex.substring(2, 4), 16);
+        b = parseInt(hex.substring(4, 6), 16);
+    } else {
+        // Use color ramp
+        const rampColors = COLOR_RAMPS[colorRamp as Exclude<H3ColorRamp, 'custom'>] || COLOR_RAMPS.viridis;
+        [r, g, b] = interpolateColor(rampColors, normalized);
+    }
+    
+    return `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`;
+}
+
+/**
+ * Get color for a specific value without opacity (solid color from ramp)
+ * Useful for stroke colors or when full opacity is needed
+ */
+export function getHexbinSolidColor(
+    value: number,
+    minValue: number,
+    maxValue: number,
+    colorRamp: H3ColorRamp,
+    customColor?: string
 ): string {
     // Normalize value to 0-1 range
     const range = maxValue - minValue;
     const normalized = range > 0 ? (value - minValue) / range : 0.5;
     
-    // Parse base color (expect hex format)
-    const hex = baseColor.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
+    let r: number, g: number, b: number;
     
-    // Adjust opacity based on value (0.3 to 0.9)
-    const opacity = 0.3 + normalized * 0.6;
+    if (colorRamp === 'custom' && customColor) {
+        const hex = customColor.replace('#', '');
+        r = parseInt(hex.substring(0, 2), 16);
+        g = parseInt(hex.substring(2, 4), 16);
+        b = parseInt(hex.substring(4, 6), 16);
+    } else {
+        const rampColors = COLOR_RAMPS[colorRamp as Exclude<H3ColorRamp, 'custom'>] || COLOR_RAMPS.viridis;
+        [r, g, b] = interpolateColor(rampColors, normalized);
+    }
     
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**

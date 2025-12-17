@@ -210,6 +210,94 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         ]
     });
 
+    h3ColorRamp: DropDown = new DropDown({
+        name: "h3ColorRamp",
+        displayName: "Color Ramp",
+        description: "Color gradient for hexbin values",
+        value: {
+            value: "viridis",
+            displayName: "Viridis (Blue-Green-Yellow)"
+        },
+        items: [
+            { value: "viridis", displayName: "Viridis (Blue-Green-Yellow)" },
+            { value: "plasma", displayName: "Plasma (Purple-Orange-Yellow)" },
+            { value: "inferno", displayName: "Inferno (Black-Red-Yellow)" },
+            { value: "magma", displayName: "Magma (Black-Purple-White)" },
+            { value: "warm", displayName: "Warm (Red-Yellow)" },
+            { value: "cool", displayName: "Cool (Blue-Cyan)" },
+            { value: "blues", displayName: "Blues" },
+            { value: "greens", displayName: "Greens" },
+            { value: "reds", displayName: "Reds" },
+            { value: "oranges", displayName: "Oranges" },
+            { value: "custom", displayName: "Custom (Single Color)" }
+        ]
+    });
+
+    h3FillColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "h3FillColor",
+        displayName: "Custom Fill Color",
+        description: "Base fill color when using custom color mode",
+        value: { value: "#3182bd" }
+    });
+
+    h3StrokeColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "h3StrokeColor",
+        displayName: "Stroke Color",
+        description: "Border color for hexbins",
+        value: { value: "#ffffff" }
+    });
+
+    h3StrokeWidth: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "h3StrokeWidth",
+        displayName: "Stroke Width",
+        description: "Border width for hexbins in pixels",
+        value: 1,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 5
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    h3MinOpacity: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "h3MinOpacity",
+        displayName: "Min Opacity",
+        description: "Minimum opacity for lowest values (0-100%)",
+        value: 30,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 100
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    h3MaxOpacity: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "h3MaxOpacity",
+        displayName: "Max Opacity",
+        description: "Maximum opacity for highest values (0-100%)",
+        value: 90,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 100
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
     // Hotspot settings
     hotspotIntensity: formattingSettings.NumUpDown = new formattingSettings.Slider({
         name: "hotspotIntensity",
@@ -245,6 +333,78 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         }
     });
 
+    hotspotColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "hotspotColor",
+        displayName: "Hotspot Color",
+        description: "Core color for heat points",
+        value: { value: "#ff6600" }
+    });
+
+    hotspotGlowColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "hotspotGlowColor",
+        displayName: "Glow Color",
+        description: "Outer glow color for heat points",
+        value: { value: "#ffcc00" }
+    });
+
+    hotspotBlurAmount: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "hotspotBlurAmount",
+        displayName: "Blur Amount",
+        description: "Amount of blur/spread for the heat effect (pixels)",
+        value: 15,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 50
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    hotspotMinOpacity: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "hotspotMinOpacity",
+        displayName: "Min Opacity",
+        description: "Minimum opacity for hotspot points (0-100%)",
+        value: 40,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 100
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    hotspotMaxOpacity: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "hotspotMaxOpacity",
+        displayName: "Max Opacity",
+        description: "Maximum opacity for hotspot points (0-100%)",
+        value: 95,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 100
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    hotspotScaleByValue: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+        name: "hotspotScaleByValue",
+        displayName: "Scale by Value",
+        description: "Scale hotspot size based on data values",
+        value: true
+    });
+
     name: string = "proportionalCirclesDisplaySettingsGroup";
     displayName: string = "Display";
     collapsible: boolean = true;
@@ -263,10 +423,24 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.enableGlow,
         this.glowColor,
         this.glowIntensity,
+        // H3 hexbin settings
         this.h3Resolution,
         this.h3AggregationType,
+        this.h3ColorRamp,
+        this.h3FillColor,
+        this.h3StrokeColor,
+        this.h3StrokeWidth,
+        this.h3MinOpacity,
+        this.h3MaxOpacity,
+        // Hotspot settings
         this.hotspotIntensity,
-        this.hotspotRadius
+        this.hotspotRadius,
+        this.hotspotColor,
+        this.hotspotGlowColor,
+        this.hotspotBlurAmount,
+        this.hotspotMinOpacity,
+        this.hotspotMaxOpacity,
+        this.hotspotScaleByValue
     ];
 
     /**
@@ -308,10 +482,24 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         // H3 hexbin settings only for H3 display type
         this.h3Resolution.visible = isH3Hexbin;
         this.h3AggregationType.visible = isH3Hexbin;
+        this.h3ColorRamp.visible = isH3Hexbin;
+        // Show custom fill color only when color ramp is 'custom'
+        const isCustomColorRamp = this.h3ColorRamp.value?.value === 'custom';
+        this.h3FillColor.visible = isH3Hexbin && isCustomColorRamp;
+        this.h3StrokeColor.visible = isH3Hexbin;
+        this.h3StrokeWidth.visible = isH3Hexbin;
+        this.h3MinOpacity.visible = isH3Hexbin;
+        this.h3MaxOpacity.visible = isH3Hexbin;
 
         // Hotspot settings only for hotspot display type
         this.hotspotIntensity.visible = isHotspot;
         this.hotspotRadius.visible = isHotspot;
+        this.hotspotColor.visible = isHotspot;
+        this.hotspotGlowColor.visible = isHotspot;
+        this.hotspotBlurAmount.visible = isHotspot;
+        this.hotspotMinOpacity.visible = isHotspot;
+        this.hotspotMaxOpacity.visible = isHotspot;
+        this.hotspotScaleByValue.visible = isHotspot;
     }
 }
 
