@@ -208,6 +208,7 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
       fontColor = '#333333',
       fontFamily = 'sans-serif',
       position = 'center',
+      labelOffset = 2,
       showBackground = false,
       backgroundColor = '#ffffff',
       backgroundOpacity = 80,
@@ -239,19 +240,19 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
 
       switch (position) {
         case 'above':
-          labelY = y - radius - fontSize / 2 - 4;
+          labelY = y - radius - fontSize / 2 - labelOffset;
           dominantBaseline = 'auto';
           break;
         case 'below':
-          labelY = y + radius + fontSize / 2 + 4;
+          labelY = y + radius + fontSize / 2 + labelOffset;
           dominantBaseline = 'hanging';
           break;
         case 'left':
-          labelX = x - radius - 4;
+          labelX = x - radius - labelOffset;
           textAnchor = 'end';
           break;
         case 'right':
-          labelX = x + radius + 4;
+          labelX = x + radius + labelOffset;
           textAnchor = 'start';
           break;
         case 'center':

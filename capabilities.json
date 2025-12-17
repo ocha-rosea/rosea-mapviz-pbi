@@ -605,6 +605,11 @@
             "enumeration": []
           }
         },
+        "labelOffset": {
+          "type": {
+            "numeric": true
+          }
+        },
         "showLabelBackground": {
           "type": {
             "bool": true

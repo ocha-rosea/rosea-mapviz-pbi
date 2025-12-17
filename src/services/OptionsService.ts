@@ -163,6 +163,7 @@ export class OptionsService {
             fontColor: labelSettings.labelFontColor.value.value,
             fontFamily: labelSettings.labelFontFamily.value.value.toString(),
             position: labelSettings.labelPosition.value.value.toString() as "center" | "above" | "below" | "left" | "right",
+            labelOffset: labelSettings.labelOffset.value,
             showBackground: labelSettings.showLabelBackground.value,
             backgroundColor: labelSettings.labelBackgroundColor.value.value,
             backgroundOpacity: labelSettings.labelBackgroundOpacity.value,

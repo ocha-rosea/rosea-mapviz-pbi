@@ -19,7 +19,7 @@ Required
 - Optional - Size Secondary for nested or donut, Tooltips
 
 ## Configure in 4 steps
-1) Chart type — nested-circles | donut-chart | pie-chart
+1) Chart type — nested-circles | donut-chart | pie-chart | **hotspot** | **h3-hexbin**
 2) Appearance — min/max radius, colors, stroke, opacities
 3) Legend — show, title, spacing, item stroke
 4) Rendering engine — SVG, Canvas, or WebGL (preview). Falls back to Canvas if WebGL is unavailable.
@@ -32,6 +32,38 @@ Color1: #f58220  Color2: #ffc800
 Opacity: 80 percent
 Legend: on  Title: Circles
 ```
+
+---
+
+## New Display Types
+
+### H3 Hexbin
+Aggregates point data into H3 hexagonal bins for spatial analysis.
+
+- **Resolution**: 0 (global) to 15 (sub-meter), default 4
+- **Color ramps**: viridis, plasma, inferno, magma, cividis, turbo, spectral, coolwarm, blues, oranges
+- **Scaling methods**: Linear, Logarithmic, Square Root, Quantile (for outlier handling)
+- **Custom styling**: Fill/stroke colors, min/max opacity
+
+### Hotspot
+Heat-style density visualization with glow effects.
+
+- **Hotspot color**: Base color for heat visualization
+- **Glow color**: Outer glow effect color
+- **Blur amount**: Controls spread/softness (default 5)
+- **Radius**: Base hotspot size (default 8)
+- **Scaling methods**: Linear, Logarithmic, Square Root, Quantile
+- **Scale by value**: Toggle to size hotspots by data value
+
+---
+
+## Circle Labels
+
+Labels can be positioned at center, above, below, left, or right of circles.
+
+- **Label Offset**: Distance in pixels between circle edge and label (0–20, default 2)
+- **Background**: Optional background box with padding, border radius, and opacity
+- **Halo**: Text stroke for readability on complex backgrounds
 
 ---
 

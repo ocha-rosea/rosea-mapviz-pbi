@@ -440,6 +440,8 @@ export interface CircleLabelOptions {
     fontFamily: string;
     /** Label position relative to circle: "center", "above", "below", "left", "right" */
     position: "center" | "above" | "below" | "left" | "right";
+    /** Offset/gap in pixels between the circle edge and the label */
+    labelOffset: number;
     /** Whether to show background behind label */
     showBackground: boolean;
     /** Background fill color */

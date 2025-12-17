@@ -815,6 +815,23 @@ export class CircleLabelSettingsGroup extends formattingSettings.SimpleCard {
         ]
     });
 
+    labelOffset: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "labelOffset",
+        displayName: "Label Offset",
+        description: "Distance in pixels between the circle edge and the label (for non-center positions)",
+        value: 2,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 20
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
     showLabelBackground: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
         name: "showLabelBackground",
         displayName: "Show Background",
@@ -943,6 +960,7 @@ export class CircleLabelSettingsGroup extends formattingSettings.SimpleCard {
         this.labelFontColor,
         this.labelFontFamily,
         this.labelPosition,
+        this.labelOffset,
         this.showLabelBackground,
         this.labelBackgroundColor,
         this.labelBackgroundOpacity,

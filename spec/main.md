@@ -3,7 +3,10 @@
 Quick, diagram-first overview. Use the quick references when building, and the full specs for details.
 
 ## TL;DR
-- Circles: single, nested, or donut. Smart scaling, selection, exact legend match.
+- Circles: single, nested, donut, **H3 hexbin**, or **hotspot**. Smart scaling, selection, exact legend match.
+- **H3 Hexbin**: Spatial aggregation with 10 color ramps and configurable resolution (0–15).
+- **Hotspot**: Density heatmap with glow effects and blur control.
+- **Scaling methods**: Linear, Logarithmic, Square Root, Quantile for outlier handling.
 - Choropleth: GeoBoundaries or custom Geo/TopoJSON. Equal interval, quantile, or natural breaks.
 - Basemaps: OSM, Mapbox, MapTiler, or none. Zoom controls optional.
 - Rendering: SVG (default), Canvas (fast), WebGL preview for circles with automatic fallback.

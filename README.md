@@ -3,7 +3,7 @@
 
 [![Build and Release](https://github.com/IM4SEA/rosea-mapviz-pbi/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/IM4SEA/rosea-mapviz-pbi/actions/workflows/build.yml) [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/ayiemba/2e6451b2d946f0f58920cc89b1b5ef8b/raw/coverage.json)](https://gist.github.com/ayiemba/2e6451b2d946f0f58920cc89b1b5ef8b)
 
-Rosea MapViz adds two map layers to Power BI—choropleth regions and scaled circles—with legends, tooltips, and modern basemaps.
+Rosea MapViz adds two map layers to Power BI—choropleth regions and scaled circles—with legends, tooltips, and modern basemaps. New display types include **H3 Hexbin** for spatial aggregation and **Hotspot** heatmaps for density visualization.
 
 Rendering engines
 
@@ -15,10 +15,14 @@ Rendering engines
 
 - Choropleth (numeric classification with color ramps)
 - Scaled circles (1–2 measures; nested, pie, or donut)
+- **H3 Hexbin** aggregation with configurable resolution (0–15) and 10 color ramps
+- **Hotspot** heatmap with customizable glow, blur, and dedicated colors
+- **Scaling methods**: Linear, Logarithmic, Square Root, Quantile (for data with outliers)
 - Works together or separately
 - Basemaps: OpenStreetMap, Mapbox, MapTiler (or none)
 - Legends, tooltips, cross-filtering, zoom control
 - Auto-fit to data; topology-preserving simplification (strength control)
+- Configurable circle label offset for fine-tuned positioning
 
 ## Screenshots
 

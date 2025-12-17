@@ -321,6 +321,7 @@ export class CircleCanvasLayer extends Layer {
       fontColor = '#333333',
       fontFamily = 'sans-serif',
       position = 'center',
+      labelOffset = 2,
       showBackground = false,
       backgroundColor = '#ffffff',
       backgroundOpacity = 80,
@@ -369,19 +370,19 @@ export class CircleCanvasLayer extends Layer {
 
       switch (position) {
         case 'above':
-          labelY = y - radius - fontSize / 2 - 4;
+          labelY = y - radius - fontSize / 2 - labelOffset;
           textBaseline = 'bottom';
           break;
         case 'below':
-          labelY = y + radius + fontSize / 2 + 4;
+          labelY = y + radius + fontSize / 2 + labelOffset;
           textBaseline = 'top';
           break;
         case 'left':
-          labelX = x - radius - 4;
+          labelX = x - radius - labelOffset;
           textAlign = 'right';
           break;
         case 'right':
-          labelX = x + radius + 4;
+          labelX = x + radius + labelOffset;
           textAlign = 'left';
           break;
         case 'center':
