@@ -132,10 +132,14 @@ export abstract class BaseOrchestrator {
      * 
      * @param extent - Bounding box extent [minX, minY, maxX, maxY]
      * @param lockMapExtent - If true, the map extent will not be changed
+     * @param fitPadding - Optional custom padding [top, right, bottom, left] in pixels
      */
-    protected fitExtentIfUnlocked(extent: number[] | undefined, lockMapExtent: boolean | undefined): void {
+    protected fitExtentIfUnlocked(extent: number[] | undefined, lockMapExtent: boolean | undefined, fitPadding?: [number, number, number, number]): void {
         if (!lockMapExtent && extent) {
-            this.map.getView().fit(extent, VisualConfig.MAP.FIT_OPTIONS);
+            const fitOptions = fitPadding 
+                ? { padding: fitPadding, duration: 0 }
+                : VisualConfig.MAP.FIT_OPTIONS;
+            this.map.getView().fit(extent, fitOptions);
         }
     }
 }

@@ -9,7 +9,7 @@ import { ChoroplethDataService } from "../services/ChoroplethDataService";
 import { LegendService, CircleMeasureLegendEntry } from "../services/LegendService";
 import { CircleSvgLayer } from "../layers/svg/circleSvgLayer";
 import { CircleCanvasLayer } from "../layers/canvas/circleCanvasLayer";
-import { CircleData, CircleLayerOptions, CircleOptions, MapToolsOptions } from "../types";
+import { CircleData, CircleLabelOptions, CircleLayerOptions, CircleOptions, MapToolsOptions } from "../types";
 import { CircleWebGLLayer } from "../layers/webgl/circleWebGLLayer";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
@@ -116,6 +116,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
      * @param dataService - Service for data processing and tooltip extraction
      * @param mapToolsOptions - Map interaction options (extent locking, render engine)
      * @param choroplethDisplayed - Whether a choropleth layer is also displayed (affects extent fitting)
+     * @param labelOptions - Optional label configuration for circle labels
      * @returns The rendered circle layer or undefined if rendering failed
      */
     public render(
@@ -123,7 +124,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
         circleOptions: CircleOptions,
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions,
-        choroplethDisplayed: boolean
+        choroplethDisplayed: boolean,
+        labelOptions?: CircleLabelOptions
     ): CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
         if (circleOptions.layerControl == false) {
             const group1 = this.svg.select(`#${DomIds.CirclesGroup1}`);
@@ -153,7 +155,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             this.messages.missingLonLat();
             return undefined;
         }
-        const { longitudes, latitudes, circleSizeValuesObjects } = parsed;
+        const { longitudes, latitudes, circleSizeValuesObjects, locationIds, tooltipValues, circleLabelValues, circleLabelFormat } = parsed;
         if (!longitudes || !latitudes) return undefined;
 
         const combinedCircleSizeValues = this.combineCircleSizeValues(circleSizeValuesObjects, circleOptions);
@@ -169,6 +171,19 @@ export class CircleOrchestrator extends BaseOrchestrator {
             return undefined;
         }
 
+        // Build label values based on labelSource option
+        const labelValues = this.buildLabelValues(labelOptions, {
+            locationIds,
+            circle1SizeValues: circleSizeValuesObjects[0]?.values as number[] | undefined,
+            circle2SizeValues: circleSizeValuesObjects[1]?.values as number[] | undefined,
+            tooltipValues,
+            circleLabelValues,
+            circle1Format: circleSizeValuesObjects[0]?.source?.format,
+            circle2Format: circleSizeValuesObjects[1]?.source?.format,
+            circleLabelFormat,
+            count: longitudes.length
+        });
+
         const layerOptions: CircleLayerOptions = this.circleOptsBuilder.build({
             longitudes,
             latitudes,
@@ -180,6 +195,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
             dataPoints,
             circle1SizeValues: circleSizeValuesObjects[0]?.values as number[],
             circle2SizeValues: circleSizeValuesObjects[1]?.values as number[],
+            labelValues,
+            labelOptions,
         });
 
         this.renderCircleLayerOnMap(layerOptions, mapToolsOptions, choroplethDisplayed);
@@ -307,7 +324,15 @@ export class CircleOrchestrator extends BaseOrchestrator {
         if (choroplethDisplayed === false && mapToolsOptions.lockMapExtent === false) {
             const anyLayer: any = this.circleLayer as any;
             const extent = anyLayer?.getFeaturesExtent?.();
-            if (extent) this.map.getView().fit(extent, VisualConfig.MAP.FIT_OPTIONS);
+            if (extent) {
+                const fitPadding: [number, number, number, number] = [
+                    mapToolsOptions.mapFitPaddingTop,
+                    mapToolsOptions.mapFitPaddingRight,
+                    mapToolsOptions.mapFitPaddingBottom,
+                    mapToolsOptions.mapFitPaddingLeft
+                ];
+                this.map.getView().fit(extent, { padding: fitPadding, duration: 0 });
+            }
         }
     }
 
@@ -455,6 +480,146 @@ export class CircleOrchestrator extends BaseOrchestrator {
         }
 
         return displayNames.join(" / ");
+    }
+
+    /**
+     * Builds label values based on the labelSource option.
+     * 
+     * @param labelOptions - Label configuration including source selection
+     * @param data - Available data for label values
+     * @returns Array of label strings or undefined if no labels should be shown
+     */
+    private buildLabelValues(
+        labelOptions: CircleLabelOptions | undefined,
+        data: {
+            locationIds?: string[];
+            circle1SizeValues?: number[];
+            circle2SizeValues?: number[];
+            tooltipValues?: (string | number | null)[];
+            circleLabelValues?: (string | number | null)[];
+            circle1Format?: string;
+            circle2Format?: string;
+            circleLabelFormat?: string;
+            count: number;
+        }
+    ): string[] | undefined {
+        if (!labelOptions?.showLabels) {
+            return undefined;
+        }
+
+        const { labelSource, displayUnits, decimalPlaces } = labelOptions;
+        const { locationIds, circle1SizeValues, circle2SizeValues, tooltipValues, circleLabelValues } = data;
+
+        switch (labelSource) {
+            case "field":
+                if (!circleLabelValues) return undefined;
+                return circleLabelValues.map(value => {
+                    if (value === null || value === undefined) return '';
+                    // If it's a number, apply formatting
+                    if (typeof value === 'number') {
+                        return this.formatNumericValue(value, displayUnits, decimalPlaces);
+                    }
+                    return String(value);
+                });
+
+            case "location":
+                return locationIds;
+
+            case "size":
+                if (!circle1SizeValues) return undefined;
+                return circle1SizeValues.map((value) => 
+                    this.formatNumericValue(value, displayUnits, decimalPlaces)
+                );
+
+            case "size2":
+                if (!circle2SizeValues) return undefined;
+                return circle2SizeValues.map((value) => 
+                    this.formatNumericValue(value, displayUnits, decimalPlaces)
+                );
+
+            case "tooltip":
+                if (!tooltipValues) return undefined;
+                return tooltipValues.map(value => {
+                    if (value === null || value === undefined) return '';
+                    // If it's a number, apply formatting
+                    if (typeof value === 'number') {
+                        return this.formatNumericValue(value, displayUnits, decimalPlaces);
+                    }
+                    return String(value);
+                });
+
+            default:
+                return undefined;
+        }
+    }
+
+    /**
+     * Formats a numeric value with display units and decimal places.
+     * 
+     * @param value - The numeric value to format
+     * @param displayUnits - Display units setting (auto, none, thousands, millions, billions, trillions)
+     * @param decimalPlaces - Number of decimal places to show
+     * @returns Formatted string representation
+     */
+    private formatNumericValue(
+        value: number | null | undefined, 
+        displayUnits: "auto" | "none" | "thousands" | "millions" | "billions" | "trillions",
+        decimalPlaces: number
+    ): string {
+        if (value === null || value === undefined) {
+            return '';
+        }
+
+        let scaledValue = value;
+        let suffix = '';
+
+        // Determine scale factor based on display units
+        switch (displayUnits) {
+            case "auto":
+                // Auto-scale based on value magnitude
+                if (Math.abs(value) >= 1e12) {
+                    scaledValue = value / 1e12;
+                    suffix = 'T';
+                } else if (Math.abs(value) >= 1e9) {
+                    scaledValue = value / 1e9;
+                    suffix = 'B';
+                } else if (Math.abs(value) >= 1e6) {
+                    scaledValue = value / 1e6;
+                    suffix = 'M';
+                } else if (Math.abs(value) >= 1e3) {
+                    scaledValue = value / 1e3;
+                    suffix = 'K';
+                }
+                break;
+            case "thousands":
+                scaledValue = value / 1e3;
+                suffix = 'K';
+                break;
+            case "millions":
+                scaledValue = value / 1e6;
+                suffix = 'M';
+                break;
+            case "billions":
+                scaledValue = value / 1e9;
+                suffix = 'B';
+                break;
+            case "trillions":
+                scaledValue = value / 1e12;
+                suffix = 'T';
+                break;
+            case "none":
+            default:
+                // No scaling
+                break;
+        }
+
+        // Format with specified decimal places
+        const formattedNumber = scaledValue.toLocaleString(undefined, {
+            minimumFractionDigits: decimalPlaces,
+            maximumFractionDigits: decimalPlaces
+        });
+
+        return formattedNumber + suffix;
     }
 
     // findClosestValue moved to src/math/circles.ts

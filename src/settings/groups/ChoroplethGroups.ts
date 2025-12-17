@@ -159,9 +159,17 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         description: "The property name in the tileset features to match with your data's location/pcode field."
     });
 
+    mapboxTilesetAccessToken: TextInput = new TextInput({
+        name: "mapboxTilesetAccessToken",
+        displayName: "Tileset Access Token",
+        value: "",
+        placeholder: "pk.eyJ1Ijoi... (optional)",
+        description: "Mapbox access token for this tileset. If blank, uses basemap token or data role token. Required for private tilesets."
+    });
+
     name: string = "choroplethLocationBoundarySettingsGroup";
     displayName: string = "Boundary";
-    collapsible: boolean = false;
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.boundaryDataSource,
         this.geoBoundariesCountry,
@@ -174,7 +182,8 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         this.customBoundaryIdField,
         this.mapboxTilesetId,
         this.mapboxTilesetSourceLayer,
-        this.mapboxTilesetIdField
+        this.mapboxTilesetIdField,
+        this.mapboxTilesetAccessToken
     ];
 
     public applyConditionalDisplayRules(): void {
@@ -261,6 +270,7 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
         this.mapboxTilesetId.visible = isMapboxSource;
         this.mapboxTilesetSourceLayer.visible = isMapboxSource;
         this.mapboxTilesetIdField.visible = isMapboxSource;
+        this.mapboxTilesetAccessToken.visible = isMapboxSource;
 
         const showGeoDropdown = selectedSource === "geoboundaries";
         const showCustomInput = selectedSource === "custom";
@@ -288,6 +298,7 @@ export class ChoroplethLocationBoundarySettingsGroup extends formattingSettings.
             newSlices.push(this.mapboxTilesetId);
             newSlices.push(this.mapboxTilesetSourceLayer);
             newSlices.push(this.mapboxTilesetIdField);
+            newSlices.push(this.mapboxTilesetAccessToken);
         }
 
         try { this.slices = newSlices; } catch (e) { }
@@ -712,6 +723,7 @@ export class ChoroplethClassificationSettingsGroup extends formattingSettings.Si
 
     name: string = "choroplethClassificationSettingsGroup";
     displayName: string = "Classification and Display";
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.classificationMethod, 
         this.numClasses,
@@ -1054,6 +1066,7 @@ export class ChoroplethLegendSettingsGroup extends formattingSettings.SimpleCard
 
     name: string = "choroplethLegendSettingsGroup";
     displayName: string = "Legend";
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.showLegend,
         this.legendTitleAlignment,
@@ -1152,6 +1165,7 @@ export class ChoroplethNestedGeometrySettingsGroup extends formattingSettings.Si
     name: string = "choroplethNestedGeometrySettingsGroup";
     displayName: string = "Nested Geometries";
     description: string = "Style settings for point and line geometries within GeometryCollections (e.g., IPC area data with location markers)";
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.showNestedPoints,
         this.nestedPointRadius,

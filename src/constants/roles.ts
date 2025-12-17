@@ -10,6 +10,7 @@ export const RoleNames = {
     Tooltips: "Tooltips",
     MapboxAccessToken: "MapboxAccessToken",
     MaptilerApiKey: "MaptilerApiKey",
+    CircleLabel: "CircleLabel",
 } as const;
 
 export type RoleName = typeof RoleNames[keyof typeof RoleNames];

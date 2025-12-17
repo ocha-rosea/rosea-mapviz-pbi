@@ -132,6 +132,14 @@
           "text": true
         }
       ]
+    },
+    {
+      "name": "CircleLabel",
+      "kind": "Measure",
+      "displayName": "Circle Label",
+      "displayNameKey": "Role_CircleLabel",
+      "description": "Field to display as labels on circles. Can be text or numeric.",
+      "descriptionKey": "Role_CircleLabel_Description"
     }
   ],
   "dataViewMappings": [
@@ -157,6 +165,9 @@
             "max": 1
           },
           "MaptilerApiKey": {
+            "max": 1
+          },
+          "CircleLabel": {
             "max": 1
           }
         }
@@ -211,6 +222,11 @@
             {
               "for": {
                 "in": "MaptilerApiKey"
+              }
+            },
+            {
+              "for": {
+                "in": "CircleLabel"
               }
             }
           ]
@@ -329,6 +345,35 @@
             "numeric": true
           }
         },
+        "enableBlur": {
+          "type": {
+            "bool": true
+          }
+        },
+        "blurRadius": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "enableGlow": {
+          "type": {
+            "bool": true
+          }
+        },
+        "glowColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "glowIntensity": {
+          "type": {
+            "numeric": true
+          }
+        },
         "showLegend": {
           "type": {
             "bool": true
@@ -409,6 +454,117 @@
           "type": {
             "numeric": true
           }
+        },
+        "showLabels": {
+          "type": {
+            "bool": true
+          }
+        },
+        "labelSource": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "labelDisplayUnits": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "labelDecimalPlaces": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "labelFontSize": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "labelFontColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "labelFontFamily": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "labelPosition": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "showLabelBackground": {
+          "type": {
+            "bool": true
+          }
+        },
+        "labelBackgroundColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "labelBackgroundOpacity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "labelBackgroundPadding": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "labelBackgroundBorderRadius": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "showLabelBorder": {
+          "type": {
+            "bool": true
+          }
+        },
+        "labelBorderColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "labelBorderWidth": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "showLabelHalo": {
+          "type": {
+            "bool": true
+          }
+        },
+        "labelHaloColor": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "labelHaloWidth": {
+          "type": {
+            "numeric": true
+          }
         }
       }
     },
@@ -475,6 +631,11 @@
           }
         },
         "mapboxTilesetIdField": {
+          "type": {
+            "text": true
+          }
+        },
+        "mapboxTilesetAccessToken": {
           "type": {
             "text": true
           }
@@ -829,6 +990,26 @@
           }
         },
         "lockedMapZoom": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingTop": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingRight": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingBottom": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingLeft": {
           "type": {
             "numeric": true
           }

@@ -16,6 +16,14 @@ export interface CircleParseResult {
     hasLon?: boolean;
     /** Whether latitude data role is present */
     hasLat?: boolean;
+    /** Array of location ID values (AdminPCodeNameID role) */
+    locationIds?: string[];
+    /** Array of tooltip values (first tooltip measure, formatted) */
+    tooltipValues?: (string | number | null)[];
+    /** Array of circle label values from the CircleLabel data role */
+    circleLabelValues?: (string | number | null)[];
+    /** Format string for circle label values */
+    circleLabelFormat?: string;
 }
 
 /**
@@ -30,9 +38,22 @@ export function parseCircleCategorical(categorical: powerbi.DataViewCategorical 
     const latCategory = categorical?.categories?.find(
         (c) => c.source?.roles?.[RoleNames.Latitude]
     );
+    const locationIdCategory = categorical?.categories?.find(
+        (c) => c.source?.roles?.[RoleNames.AdminPCodeNameID]
+    );
     const circleSizeValuesObjects = (categorical?.values?.filter(
         (c) => c.source?.roles?.[RoleNames.Size]
     ) || []) as DataViewMeasure[];
+    
+    // Extract first tooltip measure for label source option
+    const tooltipMeasure = categorical?.values?.find(
+        (c) => c.source?.roles?.[RoleNames.Tooltips]
+    );
+
+    // Extract circle label measure for dedicated label field
+    const circleLabelMeasure = categorical?.values?.find(
+        (c) => c.source?.roles?.[RoleNames.CircleLabel]
+    );
 
     return {
         longitudes: lonCategory?.values as number[] | undefined,
@@ -40,5 +61,11 @@ export function parseCircleCategorical(categorical: powerbi.DataViewCategorical 
         circleSizeValuesObjects,
         hasLon: !!lonCategory,
         hasLat: !!latCategory,
+        locationIds: locationIdCategory?.values?.map(v => 
+            v === null || v === undefined ? '' : String(v)
+        ) as string[] | undefined,
+        tooltipValues: tooltipMeasure?.values as (string | number | null)[] | undefined,
+        circleLabelValues: circleLabelMeasure?.values as (string | number | null)[] | undefined,
+        circleLabelFormat: circleLabelMeasure?.source?.format,
     };
 }

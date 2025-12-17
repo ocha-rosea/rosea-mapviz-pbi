@@ -1,7 +1,7 @@
 "use strict";
 
 import { RoseaMapVizFormattingSettingsModel } from "../settings";
-import { BasemapOptions, ChoroplethOptions, CircleOptions, MapToolsOptions } from "../types";
+import { BasemapOptions, ChoroplethOptions, CircleLabelOptions, CircleOptions, MapToolsOptions } from "../types";
 
 /**
  * Service that converts Power BI formatting settings model into typed option objects.
@@ -67,6 +67,10 @@ export class OptionsService {
             showZoomControl: maptoolsSettings.mapToolsSettingsGroup.showZoomControl.value,
             lockedMapExtent: maptoolsSettings.mapToolsSettingsGroup.lockedMapExtent.value,
             lockedMapZoom: maptoolsSettings.mapToolsSettingsGroup.lockedMapZoom.value,
+            mapFitPaddingTop: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingTop.value ?? 0,
+            mapFitPaddingRight: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingRight.value ?? 30,
+            mapFitPaddingBottom: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingBottom.value ?? 0,
+            mapFitPaddingLeft: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingLeft.value ?? 30,
             legendPosition: maptoolsSettings.legendContainerSettingsGroup.legendPosition.value.value.toString(),
             legendBorderWidth: maptoolsSettings.legendContainerSettingsGroup.legendBorderWidth.value,
             legendBorderColor: maptoolsSettings.legendContainerSettingsGroup.legendBorderColor.value.value,
@@ -114,7 +118,42 @@ export class OptionsService {
             yPadding: circleSettings.proportionalCirclesLegendSettingsGroup.yPadding.value,
             xPadding: circleSettings.proportionalCirclesLegendSettingsGroup.xPadding.value,
             chartType: circleSettings.proportionalCirclesDisplaySettingsGroup.chartType.value.value.toString(),
-            scalingMethod: 'square-root'
+            scalingMethod: 'square-root',
+            enableBlur: circleSettings.proportionalCirclesDisplaySettingsGroup.enableBlur.value,
+            blurRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.blurRadius.value,
+            enableGlow: circleSettings.proportionalCirclesDisplaySettingsGroup.enableGlow.value,
+            glowColor: circleSettings.proportionalCirclesDisplaySettingsGroup.glowColor.value?.value || '',
+            glowIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.glowIntensity.value
+        };
+    }
+
+    /**
+     * Extracts circle label configuration from the formatting model.
+     * @param model - The Power BI formatting settings model
+     * @returns Typed CircleLabelOptions for label rendering
+     */
+    static getCircleLabelOptions(model: RoseaMapVizFormattingSettingsModel): CircleLabelOptions {
+        const labelSettings = model.ProportionalCirclesVisualCardSettings.circleLabelSettingsGroup;
+        return {
+            showLabels: labelSettings.showLabels.value,
+            labelSource: labelSettings.labelSource.value.value.toString() as "field" | "location" | "size" | "size2" | "tooltip",
+            displayUnits: labelSettings.labelDisplayUnits.value.value.toString() as "auto" | "none" | "thousands" | "millions" | "billions" | "trillions",
+            decimalPlaces: labelSettings.labelDecimalPlaces.value,
+            fontSize: labelSettings.labelFontSize.value,
+            fontColor: labelSettings.labelFontColor.value.value,
+            fontFamily: labelSettings.labelFontFamily.value.value.toString(),
+            position: labelSettings.labelPosition.value.value.toString() as "center" | "above" | "below" | "left" | "right",
+            showBackground: labelSettings.showLabelBackground.value,
+            backgroundColor: labelSettings.labelBackgroundColor.value.value,
+            backgroundOpacity: labelSettings.labelBackgroundOpacity.value,
+            backgroundPadding: labelSettings.labelBackgroundPadding.value,
+            backgroundBorderRadius: labelSettings.labelBackgroundBorderRadius.value,
+            showBorder: labelSettings.showLabelBorder.value,
+            borderColor: labelSettings.labelBorderColor.value.value,
+            borderWidth: labelSettings.labelBorderWidth.value,
+            showHalo: labelSettings.showLabelHalo.value,
+            haloColor: labelSettings.labelHaloColor.value.value,
+            haloWidth: labelSettings.labelHaloWidth.value
         };
     }
 
@@ -134,12 +173,18 @@ export class OptionsService {
         const choroplethLegendSettings = choroplethSettings.choroplethLegendSettingsGroup;
         const nestedGeometrySettings = choroplethSettings.choroplethNestedGeometrySettingsGroup;
         
-        // Mapbox access token: prefer data role override, then fall back to basemap settings
+        // Mapbox access token priority: 1) tileset-specific token, 2) basemap token, 3) data role override
         const basemapSettings = model.BasemapVisualCardSettings;
-        const mapboxAccessToken = this.preferCredential(
-            overrides?.mapboxAccessToken,
-            basemapSettings.mapBoxSettingsGroup.mapboxAccessToken.value
-        );
+        const tilesetAccessToken = this.toString(choroplethLocationSettings.mapboxTilesetAccessToken.value, true);
+        const basemapToken = this.toString(basemapSettings.mapBoxSettingsGroup.mapboxAccessToken.value, true);
+        const dataRoleToken = this.toString(overrides?.mapboxAccessToken, true);
+        
+        // Priority: tileset token > basemap token > data role token
+        const mapboxAccessToken = tilesetAccessToken.length > 0 
+            ? tilesetAccessToken 
+            : basemapToken.length > 0 
+                ? basemapToken 
+                : dataRoleToken;
 
         return {
             layerControl: choroplethSettings.topLevelSlice.value,
@@ -163,8 +208,10 @@ export class OptionsService {
             mapboxTilesetId: choroplethLocationSettings.mapboxTilesetId.value,
             mapboxTilesetSourceLayer: choroplethLocationSettings.mapboxTilesetSourceLayer.value,
             mapboxTilesetIdField: choroplethLocationSettings.mapboxTilesetIdField.value,
-            // Mapbox access token: prefer data role, fall back to basemap settings
+            // Mapbox access token: resolved with priority (tileset > basemap > data role)
             mapboxAccessToken,
+            // Dedicated tileset access token (stored for reference)
+            mapboxTilesetAccessToken: tilesetAccessToken || undefined,
             // Display settings now in classification group
             invertColorRamp: choroplethClassificationSettings.invertColorRamp.value,
             colorMode: choroplethClassificationSettings.colorMode.value.value.toString(),

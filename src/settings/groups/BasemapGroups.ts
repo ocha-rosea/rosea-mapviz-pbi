@@ -38,7 +38,7 @@ export class BasemapSelectSettingsGroup extends formattingSettings.SimpleCard {
     });
 
     name: string = "basemapSelectSettingsGroup";
-    collapsible: boolean = false;
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [this.selectedBasemap, this.customMapAttribution];
 }
 

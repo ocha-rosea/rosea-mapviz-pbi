@@ -50,14 +50,47 @@ export class MapToolsSettingsGroup extends formattingSettings.SimpleCard {
         value: null
     });
 
+    mapFitPaddingTop: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "mapFitPaddingTop",
+        displayName: "Fit Padding Top",
+        description: "Padding in pixels from the top edge when auto-fitting to features",
+        value: 0
+    });
+
+    mapFitPaddingRight: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "mapFitPaddingRight",
+        displayName: "Fit Padding Right",
+        description: "Padding in pixels from the right edge when auto-fitting to features",
+        value: 30
+    });
+
+    mapFitPaddingBottom: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "mapFitPaddingBottom",
+        displayName: "Fit Padding Bottom",
+        description: "Padding in pixels from the bottom edge when auto-fitting to features",
+        value: 0
+    });
+
+    mapFitPaddingLeft: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
+        name: "mapFitPaddingLeft",
+        displayName: "Fit Padding Left",
+        description: "Padding in pixels from the left edge when auto-fitting to features",
+        value: 30
+    });
+
     name: string = "mapToolsSettingsGroup";
     displayName: string = "Map Tools";
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.renderEngine,
         this.lockMapExtent,
         this.showZoomControl,
         this.lockedMapExtent,
-        this.lockedMapZoom
+        this.lockedMapZoom,
+        this.mapFitPaddingTop,
+        this.mapFitPaddingRight,
+        this.mapFitPaddingBottom,
+        this.mapFitPaddingLeft
     ];
 
     public applyConditionalDisplayRules(): void {
@@ -210,6 +243,7 @@ export class LegendContainerSettingsGroup extends formattingSettings.SimpleCard 
 
     name: string = "legendContainerSettingsGroup";
     displayName: string = "Legend Container";
+    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.legendPosition,
         this.legendBorderWidth,

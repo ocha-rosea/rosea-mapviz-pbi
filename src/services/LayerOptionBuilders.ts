@@ -1,6 +1,6 @@
 "use strict";
 
-import { CircleLayerOptions, CircleOptions, ChoroplethLayerOptions, HighContrastColors, NestedGeometryStyle, PreparedGeometry } from "../types";
+import { CircleLabelOptions, CircleLayerOptions, CircleOptions, ChoroplethLayerOptions, HighContrastColors, NestedGeometryStyle, PreparedGeometry } from "../types";
 import * as d3 from "d3";
 import powerbi from "powerbi-visuals-api";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
@@ -57,6 +57,8 @@ export class CircleLayerOptionsBuilder {
         dataPoints: any[];
         circle1SizeValues?: number[];
         circle2SizeValues?: number[];
+        labelValues?: string[];
+        labelOptions?: CircleLabelOptions;
     }): CircleLayerOptions {
         return {
             longitudes: params.longitudes,
@@ -77,6 +79,8 @@ export class CircleLayerOptionsBuilder {
             allowInteractions: this.allowInteractions,
             isHighContrast: this.isHighContrast,
             highContrastColors: this.highContrastColors ?? undefined,
+            labelValues: params.labelValues,
+            labelOptions: params.labelOptions,
         };
     }
 }

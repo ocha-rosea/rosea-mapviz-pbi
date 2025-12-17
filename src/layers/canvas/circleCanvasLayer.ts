@@ -3,7 +3,7 @@ import { FrameState } from 'ol/Map';
 import { State } from 'ol/source/Source';
 import type { Extent } from 'ol/extent.js';
 import { transformExtent } from 'ol/proj.js';
-import { CircleLayerOptions } from '../../types';
+import { CircleLayerOptions, CircleLabelOptions } from '../../types';
 import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
 import { selectionOpacity } from '../../utils/graphics';
 import * as d3 from 'd3';
@@ -38,6 +38,23 @@ export class CircleCanvasLayer extends Layer {
 
   const project = mercatorProjector(frameState, width, height);
   const { longitudes = [], latitudes = [], combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
+
+  // Apply blur/glow effects using canvas shadow
+  const { enableBlur = false, blurRadius = 5, enableGlow = false, glowColor = '#FFFFFF', glowIntensity = 10 } = circleOptions;
+  if (enableGlow) {
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = glowIntensity * 2;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  } else if (enableBlur) {
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = blurRadius * 2;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  } else {
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+  }
 
     const allRelevantValues = [...combinedCircleSizeValues];
     for (let i = 0; i < Math.min(circle1SizeValues.length, circle2SizeValues.length); i++) {
@@ -188,7 +205,171 @@ export class CircleCanvasLayer extends Layer {
       // For now, rely on Power BI tooltip wrapper with coordinate anchoring via SVG fallback if needed.
     }
 
+    // Render labels on top of circles
+    const { labelOptions, labelValues = [] } = this.options;
+    if (labelOptions?.showLabels && labelValues.length > 0) {
+      this.renderLabels(ctx, project, labelOptions, labelValues, longitudes, latitudes, circleScale, circle1SizeValues, circle2SizeValues, circleOptions);
+    }
+
     return this.options.svgContainer;
+  }
+
+  /**
+   * Render labels for circles on canvas
+   */
+  private renderLabels(
+    ctx: CanvasRenderingContext2D,
+    project: (lon: number, lat: number) => [number, number],
+    options: CircleLabelOptions,
+    labelValues: string[],
+    longitudes: number[],
+    latitudes: number[],
+    circleScale: (v: number) => number,
+    circle1SizeValues: number[],
+    circle2SizeValues: number[],
+    circleOptions: any
+  ): void {
+    const {
+      fontSize = 12,
+      fontColor = '#333333',
+      fontFamily = 'sans-serif',
+      position = 'center',
+      showBackground = false,
+      backgroundColor = '#ffffff',
+      backgroundOpacity = 80,
+      backgroundPadding = 4,
+      backgroundBorderRadius = 0,
+      showBorder = false,
+      borderColor = '#cccccc',
+      borderWidth = 1,
+      showHalo = true,
+      haloColor = '#ffffff',
+      haloWidth = 2
+    } = options;
+
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Disable blur/glow shadow effects for labels
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    for (let i = 0; i < longitudes.length; i++) {
+      if (labelValues[i] === undefined || labelValues[i] === null || labelValues[i] === '') continue;
+      
+      const label = String(labelValues[i]);
+      const [x, y] = project(longitudes[i], latitudes[i]);
+      
+      // Calculate radius for positioning
+      const v1 = circle1SizeValues[i] ?? 0;
+      const v2 = circle2SizeValues?.[i] ?? 0;
+      const chartType = circleOptions.chartType;
+      let radius: number;
+      if (chartType === 'pie-chart' || chartType === 'donut-chart') {
+        radius = circleScale(v1 + v2);
+      } else if (circle2SizeValues?.length > 0) {
+        radius = Math.max(circleScale(v1), circleScale(v2));
+      } else {
+        radius = circleScale(v1);
+      }
+
+      // Calculate label position
+      let labelX = x;
+      let labelY = y;
+      let textAlign: CanvasTextAlign = 'center';
+      let textBaseline: CanvasTextBaseline = 'middle';
+
+      switch (position) {
+        case 'above':
+          labelY = y - radius - fontSize / 2 - 4;
+          textBaseline = 'bottom';
+          break;
+        case 'below':
+          labelY = y + radius + fontSize / 2 + 4;
+          textBaseline = 'top';
+          break;
+        case 'left':
+          labelX = x - radius - 4;
+          textAlign = 'right';
+          break;
+        case 'right':
+          labelX = x + radius + 4;
+          textAlign = 'left';
+          break;
+        case 'center':
+        default:
+          break;
+      }
+
+      ctx.textAlign = textAlign;
+      ctx.textBaseline = textBaseline;
+
+      // Measure text for background
+      const textMetrics = ctx.measureText(label);
+      const textWidth = textMetrics.width;
+      const textHeight = fontSize;
+
+      // Draw background if enabled
+      if (showBackground) {
+        const bgX = labelX - (textAlign === 'center' ? textWidth / 2 : textAlign === 'right' ? textWidth : 0) - backgroundPadding;
+        const bgY = labelY - (textBaseline === 'middle' ? textHeight / 2 : textBaseline === 'bottom' ? textHeight : 0) - backgroundPadding;
+        const bgWidth = textWidth + backgroundPadding * 2;
+        const bgHeight = textHeight + backgroundPadding * 2;
+
+        ctx.fillStyle = backgroundColor;
+        ctx.globalAlpha = backgroundOpacity / 100;
+        
+        if (backgroundBorderRadius > 0) {
+          this.roundRect(ctx, bgX, bgY, bgWidth, bgHeight, backgroundBorderRadius);
+          ctx.fill();
+        } else {
+          ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+        }
+
+        if (showBorder) {
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = borderColor;
+          ctx.lineWidth = borderWidth;
+          if (backgroundBorderRadius > 0) {
+            this.roundRect(ctx, bgX, bgY, bgWidth, bgHeight, backgroundBorderRadius);
+            ctx.stroke();
+          } else {
+            ctx.strokeRect(bgX, bgY, bgWidth, bgHeight);
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // Draw text halo if enabled
+      if (showHalo && haloWidth > 0) {
+        ctx.strokeStyle = haloColor;
+        ctx.lineWidth = haloWidth * 2;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(label, labelX, labelY);
+      }
+
+      // Draw text
+      ctx.fillStyle = fontColor;
+      ctx.fillText(label, labelX, labelY);
+    }
+  }
+
+  /**
+   * Draw a rounded rectangle path
+   */
+  private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
   }
 
   setSelectedIds(selectionIds: powerbi.extensibility.ISelectionId[]) { this.selectedIds = selectionIds; }

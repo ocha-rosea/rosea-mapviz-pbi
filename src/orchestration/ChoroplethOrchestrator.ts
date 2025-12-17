@@ -676,7 +676,15 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         if (mapToolsOptions.lockMapExtent === false) {
             const anyLayer: any = this.choroplethLayer as any;
             const extent = anyLayer?.getFeaturesExtent?.();
-            if (extent) this.map.getView().fit(extent, VisualConfig.MAP.FIT_OPTIONS);
+            if (extent) {
+                const fitPadding: [number, number, number, number] = [
+                    mapToolsOptions.mapFitPaddingTop,
+                    mapToolsOptions.mapFitPaddingRight,
+                    mapToolsOptions.mapFitPaddingBottom,
+                    mapToolsOptions.mapFitPaddingLeft
+                ];
+                this.map.getView().fit(extent, { padding: fitPadding, duration: 0 });
+            }
         }
     }
 }

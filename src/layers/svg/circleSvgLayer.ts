@@ -4,7 +4,7 @@ import { State } from 'ol/source/Source';
 import { transformExtent } from 'ol/proj.js';
 import { Extent } from 'ol/extent.js';
 import { arc as d3Arc } from 'd3-shape';
-import { CircleLayerOptions, GeoJSONFeature } from '../../types/index';
+import { CircleLayerOptions, GeoJSONFeature, CircleLabelOptions } from '../../types/index';
 import { DomIds } from "../../constants/strings";
 import { createWebMercatorProjection } from "../../utils/map";
 import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
@@ -61,12 +61,14 @@ export class CircleSvgLayer extends Layer {
 
     this.svg.select(`#${DomIds.CirclesGroup1}`).remove();
     this.svg.select(`#${DomIds.CirclesGroup2}`).remove();
+    this.svg.select(`#${DomIds.CircleLabelsGroup}`).remove();
+    this.svg.select('#circles-blur-glow-defs').remove();
     setSvgSize(this.svg, width, height);
 
     const d3Projection = createWebMercatorProjection(frameState, width, height);
 
         const { combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
-        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType } = circleOptions;
+        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity } = circleOptions;
 
         // High contrast mode: override colors with system colors
         if (this.options.isHighContrast && this.options.highContrastColors) {
@@ -75,6 +77,52 @@ export class CircleSvgLayer extends Layer {
             color2 = hcColors.hyperlink; // Use hyperlink color for secondary color to differentiate
             strokeColor = hcColors.background;
             strokeWidth = Math.max(2, strokeWidth); // Minimum 2px stroke in HC mode
+        }
+
+        // Create SVG filter definitions for blur and glow effects
+        if (enableBlur || enableGlow) {
+            const defs = this.svg.append('defs').attr('id', 'circles-blur-glow-defs');
+            
+            if (enableBlur) {
+                const blurFilter = defs.append('filter')
+                    .attr('id', 'circles-blur-filter')
+                    .attr('x', '-50%')
+                    .attr('y', '-50%')
+                    .attr('width', '200%')
+                    .attr('height', '200%');
+                blurFilter.append('feGaussianBlur')
+                    .attr('in', 'SourceGraphic')
+                    .attr('stdDeviation', blurRadius || 5);
+            }
+            
+            if (enableGlow) {
+                const effectiveGlowColor = glowColor && glowColor.length > 0 ? glowColor : color1;
+                const glowFilter = defs.append('filter')
+                    .attr('id', 'circles-glow-filter')
+                    .attr('x', '-100%')
+                    .attr('y', '-100%')
+                    .attr('width', '300%')
+                    .attr('height', '300%');
+                // Create blur for glow
+                glowFilter.append('feGaussianBlur')
+                    .attr('in', 'SourceAlpha')
+                    .attr('stdDeviation', glowIntensity || 10)
+                    .attr('result', 'blur');
+                // Colorize the blur
+                glowFilter.append('feFlood')
+                    .attr('flood-color', effectiveGlowColor)
+                    .attr('flood-opacity', '0.8')
+                    .attr('result', 'color');
+                glowFilter.append('feComposite')
+                    .attr('in', 'color')
+                    .attr('in2', 'blur')
+                    .attr('operator', 'in')
+                    .attr('result', 'glow');
+                // Merge glow with original
+                const merge = glowFilter.append('feMerge');
+                merge.append('feMergeNode').attr('in', 'glow');
+                merge.append('feMergeNode').attr('in', 'SourceGraphic');
+            }
         }
 
         // For donut/pie charts, we need to include the totals in our scaling calculations
@@ -95,6 +143,21 @@ export class CircleSvgLayer extends Layer {
 
     const circles1Group = this.svg.append('g').attr('id', DomIds.CirclesGroup1);
     const circles2Group = this.svg.append('g').attr('id', DomIds.CirclesGroup2);
+    const labelsGroup = this.svg.append('g').attr('id', DomIds.CircleLabelsGroup);
+
+    // Apply blur/glow filters to circle groups
+    const filterUrl = enableGlow ? 'url(#circles-glow-filter)' : enableBlur ? 'url(#circles-blur-filter)' : null;
+    if (filterUrl) {
+        circles1Group.attr('filter', filterUrl);
+        circles2Group.attr('filter', filterUrl);
+    }
+
+    // Get label options and values
+    const { labelOptions, labelValues = [] } = this.options;
+    const showLabels = labelOptions?.showLabels && labelValues.length > 0;
+
+    // Store circle positions for label rendering
+    const circlePositions: Array<{ x: number; y: number; radius: number; label: string }> = [];
 
         this.features.forEach((feature: GeoJSONFeature, i: number) => {
             if (!feature.geometry || feature.geometry.type !== 'Point') return;
@@ -106,6 +169,17 @@ export class CircleSvgLayer extends Layer {
                 const [x, y] = projected;
                 const radius1 = circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : minRadius;
                 const radius2 = circle2SizeValues[i] !== undefined ? circleScale(circle2SizeValues[i]) : minRadius;
+
+                // Store position for label rendering
+                if (showLabels && labelValues[i] !== undefined && labelValues[i] !== null) {
+                    const effectiveRadius = Math.max(radius1, radius2);
+                    circlePositions.push({
+                        x,
+                        y,
+                        radius: effectiveRadius,
+                        label: String(labelValues[i])
+                    });
+                }
 
                 // Chart rendering options
                 if (chartType === 'donut-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
@@ -386,11 +460,126 @@ export class CircleSvgLayer extends Layer {
             }
         });
 
+        // Render labels on top of circles
+        if (showLabels && labelOptions && circlePositions.length > 0) {
+            this.renderLabels(labelsGroup, circlePositions, labelOptions);
+        }
+
         // Reorder groups to ensure circles are above choropleth
     reorderForCirclesAboveChoropleth(this.svg);
 
     // SVG is mounted once in visual.ts inside svgContainer
         return this.options.svgContainer;
+    }
+
+    /**
+     * Render labels for circles
+     */
+    private renderLabels(
+        labelsGroup: any,
+        positions: Array<{ x: number; y: number; radius: number; label: string }>,
+        options: CircleLabelOptions
+    ): void {
+        const {
+            fontSize = 12,
+            fontColor = '#333333',
+            fontFamily = 'sans-serif',
+            position = 'center',
+            showBackground = false,
+            backgroundColor = '#ffffff',
+            backgroundOpacity = 80,
+            backgroundPadding = 4,
+            backgroundBorderRadius = 0,
+            showBorder = false,
+            borderColor = '#cccccc',
+            borderWidth = 1,
+            showHalo = true,
+            haloColor = '#ffffff',
+            haloWidth = 2
+        } = options;
+
+        positions.forEach(({ x, y, radius, label }) => {
+            // Calculate label position based on position option
+            let labelX = x;
+            let labelY = y;
+            let textAnchor = 'middle';
+            let dominantBaseline = 'central';
+
+            switch (position) {
+                case 'above':
+                    labelY = y - radius - fontSize / 2 - 4;
+                    dominantBaseline = 'auto';
+                    break;
+                case 'below':
+                    labelY = y + radius + fontSize / 2 + 4;
+                    dominantBaseline = 'hanging';
+                    break;
+                case 'left':
+                    labelX = x - radius - 4;
+                    textAnchor = 'end';
+                    break;
+                case 'right':
+                    labelX = x + radius + 4;
+                    textAnchor = 'start';
+                    break;
+                case 'center':
+                default:
+                    // Keep centered
+                    break;
+            }
+
+            // Create a group for this label
+            const labelG = labelsGroup.append('g')
+                .attr('class', 'circle-label');
+
+            // Create text element first to measure it accurately
+            const textElement = labelG.append('text')
+                .attr('x', labelX)
+                .attr('y', labelY)
+                .attr('text-anchor', textAnchor)
+                .attr('dominant-baseline', dominantBaseline)
+                .attr('font-size', `${fontSize}px`)
+                .attr('font-family', fontFamily)
+                .attr('fill', fontColor)
+                .text(label)
+                .style('pointer-events', 'none'); // Labels don't intercept clicks
+
+            // Add background rectangle if enabled (insert before text so text is on top)
+            if (showBackground) {
+                // Measure the actual rendered text
+                const bbox = textElement.node()?.getBBox() || { x: labelX, y: labelY, width: 0, height: 0 };
+
+                const rectWidth = bbox.width + backgroundPadding * 2;
+                const rectHeight = bbox.height + backgroundPadding * 2;
+                const rectX = bbox.x - backgroundPadding;
+                const rectY = bbox.y - backgroundPadding;
+
+                // Insert rect before text element (so text is rendered on top)
+                const bgRect = labelG.insert('rect', 'text')
+                    .attr('x', rectX)
+                    .attr('y', rectY)
+                    .attr('width', rectWidth)
+                    .attr('height', rectHeight)
+                    .attr('fill', backgroundColor)
+                    .attr('fill-opacity', backgroundOpacity / 100)
+                    .attr('rx', backgroundBorderRadius)
+                    .attr('ry', backgroundBorderRadius);
+
+                if (showBorder) {
+                    bgRect
+                        .attr('stroke', borderColor)
+                        .attr('stroke-width', borderWidth);
+                }
+            }
+
+            // Add halo (text stroke) for readability
+            if (showHalo && haloWidth > 0) {
+                textElement
+                    .attr('stroke', haloColor)
+                    .attr('stroke-width', haloWidth)
+                    .attr('paint-order', 'stroke fill');
+            }
+        });
     }
 
     // Expose SVG for external handlers

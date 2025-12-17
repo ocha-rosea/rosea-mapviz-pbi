@@ -4,13 +4,14 @@ import Feature from 'ol/Feature.js';
 import Point from 'ol/geom/Point.js';
 import { fromLonLat, transformExtent } from 'ol/proj.js';
 import type { Extent } from 'ol/extent.js';
-import { CircleLayerOptions } from '../../types';
+import { CircleLayerOptions, CircleLabelOptions } from '../../types';
 
 export class CircleWebGLLayer extends WebGLVectorLayer<any> {
   public options: CircleLayerOptions;
   private selectedIds: any[] = [];
   private source: VectorSource<any>;
   private hitLayerEl: any;
+  private labelsLayerEl: any;
   private detachListener?: () => void;
 
   constructor(options: CircleLayerOptions) {
@@ -85,10 +86,18 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
   // Called by orchestrator after the layer is added to the map
   attachHitLayer(map?: any) {
     try { this.options.svg.select('#circles-hitlayer').remove(); } catch {}
+    try { this.options.svg.select('#circles-labels').remove(); } catch {}
   const hit = this.options.svg.append('g').attr('id', 'circles-hitlayer');
   try { (hit as any).raise?.(); } catch {}
   hit.style('pointer-events', 'none');
     this.hitLayerEl = hit;
+    
+    // Create labels group (above hit layer)
+    const labelsGroup = this.options.svg.append('g').attr('id', 'circles-labels');
+    try { (labelsGroup as any).raise?.(); } catch {}
+    labelsGroup.style('pointer-events', 'none');
+    this.labelsLayerEl = labelsGroup;
+    
     const feats: any[] = [];
     this.source.forEachFeature(f => feats.push(f));
     const getPixel = (f: any) => {
@@ -145,6 +154,9 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
         (nodes[i] as any).setAttribute('cx', x);
         (nodes[i] as any).setAttribute('cy', y);
       });
+      
+      // Update labels positions
+      this.updateLabels(feats, getPixel);
     };
     // Initial and on map render
     updatePositions();
@@ -184,6 +196,118 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
     try { (this as any).changed?.(); } catch {}
   }
 
+  /**
+   * Update labels SVG overlay positions and content
+   */
+  private updateLabels(feats: any[], getPixel: (f: any) => number[]): void {
+    const { labelOptions, labelValues = [] } = this.options;
+    if (!labelOptions?.showLabels || !labelValues.length || !this.labelsLayerEl) return;
+
+    const {
+      fontSize = 12,
+      fontColor = '#333333',
+      fontFamily = 'sans-serif',
+      position = 'center',
+      showBackground = false,
+      backgroundColor = '#ffffff',
+      backgroundOpacity = 80,
+      backgroundPadding = 4,
+      backgroundBorderRadius = 0,
+      showBorder = false,
+      borderColor = '#cccccc',
+      borderWidth = 1,
+      showHalo = true,
+      haloColor = '#ffffff',
+      haloWidth = 2
+    } = labelOptions;
+
+    // Clear existing labels
+    this.labelsLayerEl.selectAll('*').remove();
+
+    feats.forEach((f: any, i: number) => {
+      if (labelValues[i] === undefined || labelValues[i] === null || labelValues[i] === '') return;
+      
+      const label = String(labelValues[i]);
+      const [x, y] = getPixel(f);
+      const radius = f.get('rad') || 4;
+
+      // Calculate label position
+      let labelX = x;
+      let labelY = y;
+      let textAnchor = 'middle';
+      let dominantBaseline = 'central';
+
+      switch (position) {
+        case 'above':
+          labelY = y - radius - fontSize / 2 - 4;
+          dominantBaseline = 'auto';
+          break;
+        case 'below':
+          labelY = y + radius + fontSize / 2 + 4;
+          dominantBaseline = 'hanging';
+          break;
+        case 'left':
+          labelX = x - radius - 4;
+          textAnchor = 'end';
+          break;
+        case 'right':
+          labelX = x + radius + 4;
+          textAnchor = 'start';
+          break;
+        case 'center':
+        default:
+          break;
+      }
+
+      const labelG = this.labelsLayerEl.append('g').attr('class', 'circle-label');
+
+      // Create text element first to measure it
+      const textElement = labelG.append('text')
+        .attr('x', labelX)
+        .attr('y', labelY)
+        .attr('text-anchor', textAnchor)
+        .attr('dominant-baseline', dominantBaseline)
+        .attr('font-size', `${fontSize}px`)
+        .attr('font-family', fontFamily)
+        .attr('fill', fontColor)
+        .text(label)
+        .style('pointer-events', 'none');
+
+      // Add background if enabled
+      if (showBackground) {
+        const bbox = textElement.node()?.getBBox() || { x: labelX, y: labelY, width: 0, height: 0 };
+        const rectWidth = bbox.width + backgroundPadding * 2;
+        const rectHeight = bbox.height + backgroundPadding * 2;
+        const rectX = bbox.x - backgroundPadding;
+        const rectY = bbox.y - backgroundPadding;
+
+        const bgRect = labelG.insert('rect', 'text')
+          .attr('x', rectX)
+          .attr('y', rectY)
+          .attr('width', rectWidth)
+          .attr('height', rectHeight)
+          .attr('fill', backgroundColor)
+          .attr('fill-opacity', backgroundOpacity / 100)
+          .attr('rx', backgroundBorderRadius)
+          .attr('ry', backgroundBorderRadius);
+
+        if (showBorder) {
+          bgRect
+            .attr('stroke', borderColor)
+            .attr('stroke-width', borderWidth);
+        }
+      }
+
+      // Add halo for readability
+      if (showHalo && haloWidth > 0) {
+        textElement
+          .attr('stroke', haloColor)
+          .attr('stroke-width', haloWidth)
+          .attr('paint-order', 'stroke fill');
+      }
+    });
+  }
+
   dispose() {
     try {
       const map: any = (this as any).getMap?.();
@@ -191,6 +315,7 @@ export class CircleWebGLLayer extends WebGLVectorLayer<any> {
     } catch {}
   try { if (this.detachListener) this.detachListener(); } catch {}
   try { this.options.svg.select('#circles-hitlayer').remove(); } catch {}
+  try { this.options.svg.select('#circles-labels').remove(); } catch {}
   }
 
   getFeaturesExtent(): Extent | undefined {

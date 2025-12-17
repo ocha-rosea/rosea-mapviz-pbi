@@ -290,6 +290,7 @@ export class RoseaMapViz implements IVisual {
                 maptilerApiKey: maptilerCredential
             });
             const circleOptions = OptionsService.getCircleOptions(this.visualFormattingSettingsModel);
+            const circleLabelOptions = OptionsService.getCircleLabelOptions(this.visualFormattingSettingsModel);
             const choroplethOptions = OptionsService.getChoroplethOptions(this.visualFormattingSettingsModel, {
                 mapboxAccessToken: mapboxCredential,
             });
@@ -398,7 +399,8 @@ export class RoseaMapViz implements IVisual {
                         circleOptions,
                         this.dataService,
                         this.mapToolsOptions,
-                        this.choroplethDisplayed
+                        this.choroplethDisplayed,
+                        circleLabelOptions
                     );
                     if (res && typeof (res as any).then === 'function') {
                         (res as unknown as Promise<any>)

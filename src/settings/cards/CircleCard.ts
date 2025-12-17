@@ -7,7 +7,8 @@
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 import {
     ProportionalCirclesDisplaySettingsGroup,
-    ProportionalCirclesLegendSettingsGroup
+    ProportionalCirclesLegendSettingsGroup,
+    CircleLabelSettingsGroup
 } from "../groups";
 
 /**
@@ -22,12 +23,14 @@ export class ProportionalCirclesVisualCardSettings extends formattingSettings.Co
 
     public proportionalCirclesDisplaySettingsGroup = new ProportionalCirclesDisplaySettingsGroup();
     public proportionalCirclesLegendSettingsGroup = new ProportionalCirclesLegendSettingsGroup();
+    public circleLabelSettingsGroup = new CircleLabelSettingsGroup();
 
     topLevelSlice: formattingSettings.ToggleSwitch = this.showLayerControl;
     name: string = "proportionalCirclesVisualCardSettings";
     displayName: string = "Scaled Circles";
     groups: formattingSettings.Group[] = [
         this.proportionalCirclesDisplaySettingsGroup,
-        this.proportionalCirclesLegendSettingsGroup
+        this.proportionalCirclesLegendSettingsGroup,
+        this.circleLabelSettingsGroup
     ];
 }

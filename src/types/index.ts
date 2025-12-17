@@ -279,6 +279,10 @@ export interface CircleLayerOptions extends LayerOptions {
     }>;
     tooltipServiceWrapper: ITooltipServiceWrapper;
     selectionManager: powerbi.extensibility.ISelectionManager;
+    /** Label text values to display on circles */
+    labelValues?: string[];
+    /** Label display and formatting options */
+    labelOptions?: CircleLabelOptions;
 }
 
 export interface ChoroplethLayerOptions extends LayerOptions {
@@ -388,6 +392,56 @@ export interface CircleOptions {
     labelSpacing: number;
     chartType: string; // "nested-circle" | "donut-chart" | "pie-chart"
     scalingMethod: string; // Fixed to 'square-root' for optimal area-based scaling
+    // Blur/glow effects
+    enableBlur: boolean;
+    blurRadius: number;
+    enableGlow: boolean;
+    glowColor: string;
+    glowIntensity: number;
+}
+
+/**
+ * Configuration options for circle label display and formatting.
+ */
+export interface CircleLabelOptions {
+    /** Whether to show labels on circles */
+    showLabels: boolean;
+    /** Source for label values: "field", "location", "size", "size2", "tooltip" */
+    labelSource: "field" | "location" | "size" | "size2" | "tooltip";
+    /** Display units for numeric labels: "auto", "none", "thousands", "millions", "billions", "trillions" */
+    displayUnits: "auto" | "none" | "thousands" | "millions" | "billions" | "trillions";
+    /** Number of decimal places for numeric labels */
+    decimalPlaces: number;
+    /** Font size in pixels */
+    fontSize: number;
+    /** Font color (hex or CSS color) */
+    fontColor: string;
+    /** Font family (e.g., "sans-serif", "Arial") */
+    fontFamily: string;
+    /** Label position relative to circle: "center", "above", "below", "left", "right" */
+    position: "center" | "above" | "below" | "left" | "right";
+    /** Whether to show background behind label */
+    showBackground: boolean;
+    /** Background fill color */
+    backgroundColor: string;
+    /** Background opacity (0-100) */
+    backgroundOpacity: number;
+    /** Background padding in pixels */
+    backgroundPadding: number;
+    /** Background border radius in pixels */
+    backgroundBorderRadius: number;
+    /** Whether to show border around label background */
+    showBorder: boolean;
+    /** Border stroke color */
+    borderColor: string;
+    /** Border stroke width in pixels */
+    borderWidth: number;
+    /** Whether to show text halo (text stroke) for readability */
+    showHalo: boolean;
+    /** Halo stroke color */
+    haloColor: string;
+    /** Halo stroke width in pixels */
+    haloWidth: number;
 }
 
 export interface ChoroplethOptions {
@@ -414,8 +468,10 @@ export interface ChoroplethOptions {
     mapboxTilesetSourceLayer?: string;
     /** Property name to match with data's location/pcode field */
     mapboxTilesetIdField?: string;
-    /** Mapbox access token for tileset API calls */
+    /** Mapbox access token for tileset API calls (fallback from basemap or data role) */
     mapboxAccessToken?: string;
+    /** Dedicated Mapbox access token for tileset (highest priority) */
+    mapboxTilesetAccessToken?: string;
 
     //usePredefinedColorRamp: boolean;
 
@@ -487,6 +543,12 @@ export interface MapToolsOptions {
 
     lockedMapExtent: string; // Stores the locked map extent as a comma-separated string: "minX,minY,maxX,maxY"
     lockedMapZoom?: number; // Stores the locked map zoom level
+
+    // Map fit padding options (in pixels)
+    mapFitPaddingTop: number;
+    mapFitPaddingRight: number;
+    mapFitPaddingBottom: number;
+    mapFitPaddingLeft: number;
 
     legendPosition: string;
     legendBorderWidth: number;

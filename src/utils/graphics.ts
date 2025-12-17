@@ -16,8 +16,12 @@ export function reorderForCirclesAboveChoropleth(svg: any) {
   const choroplethGroupNode = svg.select(`#${DomIds.ChoroplethGroup}`).node();
   const circles1GroupNode = svg.select(`#${DomIds.CirclesGroup1}`).node();
   const circles2GroupNode = svg.select(`#${DomIds.CirclesGroup2}`).node();
+  const labelsGroupNode = svg.select(`#${DomIds.CircleLabelsGroup}`).node();
   if (choroplethGroupNode && circles1GroupNode && circles2GroupNode) {
     choroplethGroupNode.parentNode.appendChild(circles1GroupNode);
     choroplethGroupNode.parentNode.appendChild(circles2GroupNode);
+    if (labelsGroupNode) {
+      choroplethGroupNode.parentNode.appendChild(labelsGroupNode);
+    }
   }
 }

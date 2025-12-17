@@ -101,7 +101,13 @@ export class MapToolsOrchestrator {
           zoom = this.mapToolsOptions.lockedMapZoom;
         }
         this.mapService.lockExtent(lockedExtent, center, zoom);
-        this.map.getView().fit(lockedExtent, VisualConfig.MAP.FIT_OPTIONS);
+        const fitPadding: [number, number, number, number] = [
+          this.mapToolsOptions.mapFitPaddingTop,
+          this.mapToolsOptions.mapFitPaddingRight,
+          this.mapToolsOptions.mapFitPaddingBottom,
+          this.mapToolsOptions.mapFitPaddingLeft
+        ];
+        this.map.getView().fit(lockedExtent, { padding: fitPadding, duration: 0 });
       }
     } else {
       this.detach();

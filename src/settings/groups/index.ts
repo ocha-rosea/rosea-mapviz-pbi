@@ -14,7 +14,8 @@ export {
 // Circle (Proportional Circles) settings groups
 export {
     ProportionalCirclesDisplaySettingsGroup,
-    ProportionalCirclesLegendSettingsGroup
+    ProportionalCirclesLegendSettingsGroup,
+    CircleLabelSettingsGroup
 } from "./CircleGroups";
 
 // Choropleth settings groups

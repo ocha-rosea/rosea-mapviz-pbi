@@ -18,6 +18,7 @@ export const DomIds = {
     CirclesGroup1: "circles-group-1",
     CirclesGroup2: "circles-group-2",
     ChoroplethGroup: "choropleth-group",
+    CircleLabelsGroup: "circle-labels-group",
 } as const;
 
 export const LegendPositions = {
