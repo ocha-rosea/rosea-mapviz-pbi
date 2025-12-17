@@ -39,8 +39,21 @@ export class CircleCanvasLayer extends Layer {
   const project = mercatorProjector(frameState, width, height);
   const { longitudes = [], latitudes = [], combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
 
+  // Check if hotspot mode
+  const isHotspot = circleOptions.chartType === 'hotspot';
+  const hotspotRadius = circleOptions.hotspotRadius || 20;
+  const hotspotIntensity = circleOptions.hotspotIntensity || 1;
+
   // Apply blur/glow effects using canvas shadow
-  const { enableBlur = false, blurRadius = 5, enableGlow = false, glowColor = '#FFFFFF', glowIntensity = 10 } = circleOptions;
+  let { enableBlur = false, blurRadius = 5, enableGlow = false, glowColor = '#FFFFFF', glowIntensity = 10 } = circleOptions;
+  
+  // Hotspot mode: auto-enable glow
+  if (isHotspot) {
+    enableGlow = true;
+    glowIntensity = hotspotIntensity * 15;
+    glowColor = circleOptions.glowColor || circleOptions.color1;
+  }
+
   if (enableGlow) {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = glowIntensity * 2;
@@ -78,11 +91,48 @@ export class CircleCanvasLayer extends Layer {
 
   for (let i = 0; i < longitudes.length; i++) {
       const [x, y] = project(longitudes[i], latitudes[i]);
-      const r1 = circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : circleOptions.minRadius;
+      // For hotspot, use fixed radius; otherwise use scaled radius
+      const r1 = isHotspot ? hotspotRadius : (circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : circleOptions.minRadius);
       const r2 = circle2SizeValues[i] !== undefined ? circleScale(circle2SizeValues[i]) : circleOptions.minRadius;
 
       const chartType = circleOptions.chartType;
-      if (chartType === 'donut-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
+      
+      // Hotspot rendering - glowing heat points
+      if (isHotspot) {
+        ctx.beginPath();
+        ctx.arc(x, y, r1, 0, 2*Math.PI);
+        const selId = this.options.dataPoints?.[i]?.selectionId as any;
+        const opacity = Math.min(1, hotspotIntensity * 0.7);
+        ctx.fillStyle = applyOpacity(circleOptions.color1, selectionOpacity(this.selectedIds, selId, opacity));
+        ctx.fill();
+        // No stroke for hotspots
+
+        // Invisible hit target
+        const [hx, hy] = d3Projection([longitudes[i], latitudes[i]]) as [number, number];
+        const hit = hitLayer.append('circle')
+          .attr('cx', hx)
+          .attr('cy', hy)
+          .attr('r', r1)
+          .style('fill', 'transparent')
+          .style('stroke', 'transparent')
+          .style('cursor', 'pointer')
+          .style('pointer-events', 'all')
+          .datum(this.options.dataPoints?.[i]?.selectionId);
+        if (this.options.dataPoints?.[i]?.tooltip) {
+          this.options.tooltipServiceWrapper.addTooltip(
+            hit as any,
+            () => this.options.dataPoints?.[i]?.tooltip,
+            () => this.options.dataPoints?.[i]?.selectionId,
+            true
+          );
+        }
+        hit.on('click', (event: MouseEvent) => {
+          const selectionId = this.options.dataPoints?.[i]?.selectionId;
+          const nativeEvent = event;
+          this.options.selectionManager.select(selectionId as any, nativeEvent.ctrlKey || nativeEvent.metaKey)
+            .then((selectedIds: powerbi.extensibility.ISelectionId[]) => { this.selectedIds = selectedIds; this.changed(); });
+        });
+      } else if (chartType === 'donut-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
         const v1 = circle1SizeValues[i];
         const v2 = circle2SizeValues[i];
         const total = v1 + v2;

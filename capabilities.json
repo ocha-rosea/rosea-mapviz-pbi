@@ -374,6 +374,26 @@
             "numeric": true
           }
         },
+        "h3Resolution": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "h3AggregationType": {
+          "type": {
+            "enumeration": []
+          }
+        },
+        "hotspotIntensity": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "hotspotRadius": {
+          "type": {
+            "numeric": true
+          }
+        },
         "showLegend": {
           "type": {
             "bool": true

@@ -390,7 +390,7 @@ export interface CircleOptions {
     yPadding: number;
     xPadding: number;
     labelSpacing: number;
-    chartType: string; // "nested-circle" | "donut-chart" | "pie-chart"
+    chartType: string; // "nested-circle" | "donut-chart" | "pie-chart" | "hotspot" | "h3-hexbin"
     scalingMethod: string; // Fixed to 'square-root' for optimal area-based scaling
     // Blur/glow effects
     enableBlur: boolean;
@@ -398,6 +398,12 @@ export interface CircleOptions {
     enableGlow: boolean;
     glowColor: string;
     glowIntensity: number;
+    // H3 Hexbin settings
+    h3Resolution: number;
+    h3AggregationType: string; // "sum" | "count" | "average" | "min" | "max"
+    // Hotspot settings
+    hotspotIntensity: number;
+    hotspotRadius: number;
 }
 
 /**

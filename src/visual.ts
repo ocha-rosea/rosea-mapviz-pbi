@@ -276,6 +276,13 @@ export class RoseaMapViz implements IVisual {
             this.visualFormattingSettingsModel.mapControlsVisualCardSettings.mapToolsSettingsGroup.applyConditionalDisplayRules();
             this.visualFormattingSettingsModel.mapControlsVisualCardSettings.legendContainerSettingsGroup.applyConditionalDisplayRules();
 
+            // Detect if Circle 2 data is present for conditional settings visibility
+            const circleSizeValues = categorical?.values?.filter(c => c.source?.roles?.[RoleNames.Size]) || [];
+            const hasCircle2Data = circleSizeValues.length >= 2;
+            const circleDisplayGroup = this.visualFormattingSettingsModel.proportionalCirclesVisualCardSettings.proportionalCirclesDisplaySettingsGroup;
+            circleDisplayGroup.setCircle2DataAvailable(hasCircle2Data);
+            circleDisplayGroup.applyConditionalDisplayRules();
+
             const basemapSettingGroups = this.visualFormattingSettingsModel.BasemapVisualCardSettings;
             basemapSettingGroups.mapBoxSettingsGroup.mapboxAccessToken.visible = !mapboxCredential;
             basemapSettingGroups.maptilerSettingsGroup.maptilerApiKey.visible = !maptilerCredential;

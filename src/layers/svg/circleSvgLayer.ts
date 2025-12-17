@@ -68,7 +68,7 @@ export class CircleSvgLayer extends Layer {
     const d3Projection = createWebMercatorProjection(frameState, width, height);
 
         const { combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
-        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity } = circleOptions;
+        let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity, hotspotIntensity, hotspotRadius } = circleOptions;
 
         // High contrast mode: override colors with system colors
         if (this.options.isHighContrast && this.options.highContrastColors) {
@@ -77,6 +77,16 @@ export class CircleSvgLayer extends Layer {
             color2 = hcColors.hyperlink; // Use hyperlink color for secondary color to differentiate
             strokeColor = hcColors.background;
             strokeWidth = Math.max(2, strokeWidth); // Minimum 2px stroke in HC mode
+        }
+
+        // Hotspot mode: auto-enable glow and use hotspot-specific settings
+        const isHotspot = chartType === 'hotspot';
+        if (isHotspot) {
+            enableGlow = true;
+            glowIntensity = (hotspotIntensity || 1) * 15; // Scale intensity for glow
+            glowColor = glowColor || color1;
+            strokeWidth = 0; // No stroke for hotspots
+            layer1Opacity = Math.min(1, (hotspotIntensity || 1) * 0.7); // Adjust opacity based on intensity
         }
 
         // Create SVG filter definitions for blur and glow effects
@@ -167,7 +177,9 @@ export class CircleSvgLayer extends Layer {
 
             if (projected) {
                 const [x, y] = projected;
-                const radius1 = circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : minRadius;
+                // For hotspot, use hotspotRadius directly; otherwise use scaled radius
+                const hotspotR = hotspotRadius || 20;
+                const radius1 = isHotspot ? hotspotR : (circle1SizeValues[i] !== undefined ? circleScale(circle1SizeValues[i]) : minRadius);
                 const radius2 = circle2SizeValues[i] !== undefined ? circleScale(circle2SizeValues[i]) : minRadius;
 
                 // Store position for label rendering
@@ -181,8 +193,52 @@ export class CircleSvgLayer extends Layer {
                     });
                 }
 
+                // Hotspot rendering - glowing heat points
+                if (isHotspot) {
+                    const hotspot = circles1Group.append('circle')
+                        .attr('cx', x)
+                        .attr('cy', y)
+                        .attr('r', radius1)
+                        .attr('fill', color1)
+                        .attr('stroke', 'none')
+                        .datum(feature.properties.selectionId)
+                        .style('cursor', 'pointer')
+                        .style('pointer-events', 'all')
+                        .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, d, layer1Opacity));
+
+                    if (feature.properties.tooltip) {
+                        this.options.tooltipServiceWrapper.addTooltip(
+                            hotspot,
+                            () => feature.properties.tooltip,
+                            () => feature.properties.selectionId,
+                            true
+                        );
+                    }
+
+                    // Click handler for hotspot (only if interactions are allowed)
+                    if (this.options.allowInteractions !== false) {
+                        hotspot.on('click', (event: MouseEvent) => {
+                            const selectionId = feature.properties.selectionId;
+                            const nativeEvent = event;
+                            this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                                .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                    this.selectedIds = selectedIds;
+                                    this.changed();
+                                });
+                        });
+
+                        hotspot.on('contextmenu', (event: MouseEvent) => {
+                            event.preventDefault();
+                            const selectionId = feature.properties.selectionId;
+                            this.options.selectionManager.showContextMenu(
+                                selectionId ? selectionId : {},
+                                { x: event.clientX, y: event.clientY }
+                            );
+                        });
+                    }
+                }
                 // Chart rendering options
-                if (chartType === 'donut-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
+                else if (chartType === 'donut-chart' && circle2SizeValues.length > 0 && circle1SizeValues[i] !== undefined && circle2SizeValues[i] !== undefined) {
                     // Draw donut chart at (x, y)
                     const value1 = circle1SizeValues[i];
                     const value2 = circle2SizeValues[i];

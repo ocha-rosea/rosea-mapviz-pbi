@@ -123,7 +123,11 @@ export class OptionsService {
             blurRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.blurRadius.value,
             enableGlow: circleSettings.proportionalCirclesDisplaySettingsGroup.enableGlow.value,
             glowColor: circleSettings.proportionalCirclesDisplaySettingsGroup.glowColor.value?.value || '',
-            glowIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.glowIntensity.value
+            glowIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.glowIntensity.value,
+            h3Resolution: circleSettings.proportionalCirclesDisplaySettingsGroup.h3Resolution.value,
+            h3AggregationType: circleSettings.proportionalCirclesDisplaySettingsGroup.h3AggregationType.value.value.toString(),
+            hotspotIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotIntensity.value,
+            hotspotRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotRadius.value
         };
     }
 

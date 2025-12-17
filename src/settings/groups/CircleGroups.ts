@@ -13,9 +13,12 @@ import DropDown = formattingSettings.ItemDropdown;
  * Settings group for proportional circles display styling.
  */
 export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.SimpleCard {
+    // Flag to track if Circle 2 data is available (set by visual.ts)
+    private _hasCircle2Data: boolean = false;
+
     chartType: DropDown = new DropDown({
         name: "chartType",
-        displayName: "Chart Type",
+        displayName: "Display Type",
         value: {
             value: "nested-circle",
             displayName: "Nested Circle"
@@ -23,7 +26,9 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         items: [
             { value: "nested-circle", displayName: "Nested Circle" },
             { value: "donut-chart", displayName: "Donut Chart" },
-            { value: "pie-chart", displayName: "Pie Chart" }
+            { value: "pie-chart", displayName: "Pie Chart" },
+            { value: "hotspot", displayName: "Hotspot (Heat Points)" },
+            { value: "h3-hexbin", displayName: "H3 Hexbin Aggregation" }
         ]
     });
 
@@ -170,6 +175,76 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         }
     });
 
+    // H3 Hexbin settings
+    h3Resolution: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "h3Resolution",
+        displayName: "H3 Resolution",
+        description: "H3 hexbin resolution (0=largest, 15=smallest). Lower values create larger hexbins.",
+        value: 4,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 15
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0
+            }
+        }
+    });
+
+    h3AggregationType: DropDown = new DropDown({
+        name: "h3AggregationType",
+        displayName: "Aggregation",
+        description: "How to aggregate values within each hexbin",
+        value: {
+            value: "sum",
+            displayName: "Sum"
+        },
+        items: [
+            { value: "sum", displayName: "Sum" },
+            { value: "count", displayName: "Count" },
+            { value: "average", displayName: "Average" },
+            { value: "min", displayName: "Minimum" },
+            { value: "max", displayName: "Maximum" }
+        ]
+    });
+
+    // Hotspot settings
+    hotspotIntensity: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "hotspotIntensity",
+        displayName: "Hotspot Intensity",
+        description: "Base intensity multiplier for heat points",
+        value: 1,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 10
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 0.1
+            }
+        }
+    });
+
+    hotspotRadius: formattingSettings.NumUpDown = new formattingSettings.Slider({
+        name: "hotspotRadius",
+        displayName: "Hotspot Radius",
+        description: "Radius of influence for each heat point in pixels",
+        value: 20,
+        options: {
+            maxValue: {
+                type: powerbi.visuals.ValidatorType.Max,
+                value: 100
+            },
+            minValue: {
+                type: powerbi.visuals.ValidatorType.Min,
+                value: 5
+            }
+        }
+    });
+
     name: string = "proportionalCirclesDisplaySettingsGroup";
     displayName: string = "Display";
     collapsible: boolean = true;
@@ -187,16 +262,56 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.blurRadius,
         this.enableGlow,
         this.glowColor,
-        this.glowIntensity
+        this.glowIntensity,
+        this.h3Resolution,
+        this.h3AggregationType,
+        this.hotspotIntensity,
+        this.hotspotRadius
     ];
 
+    /**
+     * Set whether Circle 2 data is available in the current data view.
+     * Call this from visual.ts before applying conditional display rules.
+     */
+    public setCircle2DataAvailable(hasData: boolean): void {
+        this._hasCircle2Data = hasData;
+    }
+
     public applyConditionalDisplayRules(): void {
-        // Show blur radius only when blur is enabled
-        this.blurRadius.visible = this.enableBlur.value === true;
-        
-        // Show glow options only when glow is enabled
-        this.glowColor.visible = this.enableGlow.value === true;
-        this.glowIntensity.visible = this.enableGlow.value === true;
+        const displayType = this.chartType.value?.value || 'nested-circle';
+        const isHotspot = displayType === 'hotspot';
+        const isH3Hexbin = displayType === 'h3-hexbin';
+        const isCircleChart = !isHotspot && !isH3Hexbin;
+        const requiresCircle2 = displayType === 'nested-circle' || displayType === 'donut-chart' || displayType === 'pie-chart';
+
+        // Circle 2 settings only shown for chart types that use them AND when Circle 2 data is present
+        const showCircle2Settings = requiresCircle2 && this._hasCircle2Data;
+        this.proportionalCircles2Color.visible = showCircle2Settings;
+        this.proportionalCircles2LayerOpacity.visible = showCircle2Settings;
+
+        // Standard circle settings visible for circle charts only
+        this.proportionalCircles1Color.visible = isCircleChart;
+        this.proportionalCirclesMinimumRadius.visible = isCircleChart;
+        this.proportionalCirclesMaximumRadius.visible = isCircleChart;
+        this.proportionalCirclesStrokeColor.visible = isCircleChart;
+        this.proportionalCirclesStrokeWidth.visible = isCircleChart;
+        this.proportionalCircles1LayerOpacity.visible = isCircleChart;
+
+        // Blur/glow effects for circles and hotspot (not H3)
+        const showEffects = isCircleChart || isHotspot;
+        this.enableBlur.visible = showEffects;
+        this.blurRadius.visible = showEffects && this.enableBlur.value === true;
+        this.enableGlow.visible = showEffects;
+        this.glowColor.visible = showEffects && this.enableGlow.value === true;
+        this.glowIntensity.visible = showEffects && this.enableGlow.value === true;
+
+        // H3 hexbin settings only for H3 display type
+        this.h3Resolution.visible = isH3Hexbin;
+        this.h3AggregationType.visible = isH3Hexbin;
+
+        // Hotspot settings only for hotspot display type
+        this.hotspotIntensity.visible = isHotspot;
+        this.hotspotRadius.visible = isHotspot;
     }
 }
 
