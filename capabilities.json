@@ -422,6 +422,11 @@
             "numeric": true
           }
         },
+        "h3ScalingMethod": {
+          "type": {
+            "enumeration": []
+          }
+        },
         "hotspotIntensity": {
           "type": {
             "numeric": true
@@ -468,6 +473,11 @@
         "hotspotScaleByValue": {
           "type": {
             "bool": true
+          }
+        },
+        "hotspotScalingMethod": {
+          "type": {
+            "enumeration": []
           }
         },
         "showLegend": {

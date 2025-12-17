@@ -13,6 +13,11 @@ import { latLngToCell, cellToBoundary, cellToLatLng } from 'h3-js';
 export type H3AggregationType = 'sum' | 'count' | 'average' | 'min' | 'max';
 
 /**
+ * Scaling methods for value normalization
+ */
+export type ScalingMethod = 'linear' | 'logarithmic' | 'squareRoot' | 'quantile';
+
+/**
  * Color ramp types for hexbin visualization
  */
 export type H3ColorRamp = 'viridis' | 'plasma' | 'inferno' | 'magma' | 'warm' | 'cool' | 
@@ -26,6 +31,9 @@ export interface H3ColorOptions {
     customColor?: string;
     minOpacity: number; // 0-100
     maxOpacity: number; // 0-100
+    scalingMethod?: ScalingMethod;
+    /** All values for quantile calculation (optional) */
+    allValues?: number[];
 }
 
 /**
@@ -54,6 +62,54 @@ export interface H3AggregationOptions {
     resolution: number;
     /** Aggregation method */
     aggregationType: H3AggregationType;
+}
+
+/**
+ * Apply scaling transformation to normalize a value
+ * This spreads out values more evenly, especially helpful for data with outliers
+ */
+export function applyScaling(
+    value: number,
+    minValue: number,
+    maxValue: number,
+    method: ScalingMethod,
+    allValues?: number[]
+): number {
+    if (maxValue <= minValue) return 0.5;
+    
+    switch (method) {
+        case 'logarithmic': {
+            // Add 1 to handle zeros, use natural log
+            const logMin = Math.log1p(minValue);
+            const logMax = Math.log1p(maxValue);
+            const logVal = Math.log1p(value);
+            return logMax > logMin ? (logVal - logMin) / (logMax - logMin) : 0.5;
+        }
+        
+        case 'squareRoot': {
+            // Square root scaling - less aggressive than log
+            const sqrtMin = Math.sqrt(Math.max(0, minValue));
+            const sqrtMax = Math.sqrt(Math.max(0, maxValue));
+            const sqrtVal = Math.sqrt(Math.max(0, value));
+            return sqrtMax > sqrtMin ? (sqrtVal - sqrtMin) / (sqrtMax - sqrtMin) : 0.5;
+        }
+        
+        case 'quantile': {
+            // Quantile-based scaling - equal number of items in each color band
+            if (!allValues || allValues.length === 0) {
+                // Fall back to linear if no values provided
+                return (value - minValue) / (maxValue - minValue);
+            }
+            // Sort values and find percentile rank
+            const sorted = [...allValues].sort((a, b) => a - b);
+            const rank = sorted.filter(v => v <= value).length;
+            return rank / sorted.length;
+        }
+        
+        case 'linear':
+        default:
+            return (value - minValue) / (maxValue - minValue);
+    }
 }
 
 /**
@@ -254,12 +310,12 @@ function interpolateColor(ramp: [number, number, number][], t: number): [number,
 }
 
 /**
- * Get color based on value using a color ramp with configurable opacity
+ * Get color based on value using a color ramp with configurable opacity and scaling
  * 
  * @param value - The value to map to a color
  * @param minValue - Minimum value in the dataset
  * @param maxValue - Maximum value in the dataset
- * @param options - Color options including ramp type, custom color, and opacity range
+ * @param options - Color options including ramp type, custom color, opacity range, and scaling method
  * @returns RGBA color string
  */
 export function getHexbinColor(
@@ -268,11 +324,10 @@ export function getHexbinColor(
     maxValue: number,
     options: H3ColorOptions
 ): string {
-    const { colorRamp, customColor, minOpacity, maxOpacity } = options;
+    const { colorRamp, customColor, minOpacity, maxOpacity, scalingMethod = 'linear', allValues } = options;
     
-    // Normalize value to 0-1 range
-    const range = maxValue - minValue;
-    const normalized = range > 0 ? (value - minValue) / range : 0.5;
+    // Apply scaling transformation for better distribution
+    const normalized = applyScaling(value, minValue, maxValue, scalingMethod, allValues);
     
     // Calculate opacity (convert from 0-100 to 0-1)
     const opacity = (minOpacity / 100) + normalized * ((maxOpacity - minOpacity) / 100);

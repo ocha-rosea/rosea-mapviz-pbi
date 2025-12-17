@@ -8,7 +8,7 @@ import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
 import { selectionOpacity } from '../../utils/graphics';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
-import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions } from '../../utils/h3Aggregation';
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions, ScalingMethod, applyScaling } from '../../utils/h3Aggregation';
 
 export class CircleCanvasLayer extends Layer {
   public options: CircleLayerOptions;
@@ -50,6 +50,7 @@ export class CircleCanvasLayer extends Layer {
   const hotspotMinOpacity = (circleOptions.hotspotMinOpacity || 40) / 100;
   const hotspotMaxOpacity = (circleOptions.hotspotMaxOpacity || 95) / 100;
   const hotspotScaleByValue = circleOptions.hotspotScaleByValue !== false;
+  const hotspotScalingMethod = (circleOptions.hotspotScalingMethod || 'logarithmic') as ScalingMethod;
 
   // Apply blur/glow effects using canvas shadow
   let { enableBlur = false, blurRadius = 5, enableGlow = false, glowColor = '#FFFFFF', glowIntensity = 10 } = circleOptions;
@@ -114,8 +115,9 @@ export class CircleCanvasLayer extends Layer {
       let r1: number;
       if (isHotspot) {
         if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
-          // Scale hotspot size based on data value (between 0.3x and 1.5x base radius)
-          const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+          // Apply scaling method for better distribution with outliers
+          const normalized = applyScaling(circle1SizeValues[i], minCircleSizeValue, maxCircleSizeValue, hotspotScalingMethod, circle1SizeValues);
+          // Scale hotspot size (between 0.3x and 1.5x base radius)
           r1 = hotspotRadius * (0.3 + normalized * 1.2);
         } else {
           r1 = hotspotRadius;
@@ -132,10 +134,10 @@ export class CircleCanvasLayer extends Layer {
         ctx.beginPath();
         ctx.arc(x, y, r1, 0, 2*Math.PI);
         const selId = this.options.dataPoints?.[i]?.selectionId as any;
-        // Calculate opacity based on value and min/max settings
+        // Calculate opacity based on value and min/max settings using scaling
         let opacity = hotspotMaxOpacity;
         if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
-          const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+          const normalized = applyScaling(circle1SizeValues[i], minCircleSizeValue, maxCircleSizeValue, hotspotScalingMethod, circle1SizeValues);
           opacity = hotspotMinOpacity + normalized * (hotspotMaxOpacity - hotspotMinOpacity);
         }
         ctx.fillStyle = applyOpacity(hotspotColor, selectionOpacity(this.selectedIds, selId, opacity));
@@ -503,7 +505,8 @@ export class CircleCanvasLayer extends Layer {
       h3StrokeColor = '#ffffff',
       h3StrokeWidth = 1,
       h3MinOpacity = 30,
-      h3MaxOpacity = 90
+      h3MaxOpacity = 90,
+      h3ScalingMethod = 'logarithmic'
     } = circleOptions;
 
     // Create D3 projection for coordinate conversion
@@ -531,12 +534,14 @@ export class CircleCanvasLayer extends Layer {
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
-    // Prepare color options
+    // Prepare color options with scaling method
     const colorOptions: H3ColorOptions = {
       colorRamp: h3ColorRamp as H3ColorRamp,
       customColor: h3FillColor,
       minOpacity: h3MinOpacity,
-      maxOpacity: h3MaxOpacity
+      maxOpacity: h3MaxOpacity,
+      scalingMethod: h3ScalingMethod as ScalingMethod,
+      allValues: values // Pass all values for quantile calculation
     };
 
     // Remove previous hit overlay

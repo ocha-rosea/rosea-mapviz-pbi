@@ -407,6 +407,7 @@ export interface CircleOptions {
     h3StrokeWidth: number;
     h3MinOpacity: number; // 0-100
     h3MaxOpacity: number; // 0-100
+    h3ScalingMethod: string; // "linear" | "logarithmic" | "squareRoot" | "quantile"
     // Hotspot settings
     hotspotIntensity: number;
     hotspotRadius: number;
@@ -416,6 +417,7 @@ export interface CircleOptions {
     hotspotMinOpacity: number; // 0-100
     hotspotMaxOpacity: number; // 0-100
     hotspotScaleByValue: boolean;
+    hotspotScalingMethod: string; // "linear" | "logarithmic" | "squareRoot" | "quantile"
 }
 
 /**

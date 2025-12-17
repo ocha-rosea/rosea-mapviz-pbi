@@ -298,6 +298,22 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         }
     });
 
+    h3ScalingMethod: DropDown = new DropDown({
+        name: "h3ScalingMethod",
+        displayName: "Value Scaling",
+        description: "How to scale values for color mapping. Logarithmic/Quantile work better with outliers.",
+        value: {
+            value: "logarithmic",
+            displayName: "Logarithmic (Best for outliers)"
+        },
+        items: [
+            { value: "linear", displayName: "Linear" },
+            { value: "logarithmic", displayName: "Logarithmic (Best for outliers)" },
+            { value: "squareRoot", displayName: "Square Root" },
+            { value: "quantile", displayName: "Quantile (Equal distribution)" }
+        ]
+    });
+
     // Hotspot settings
     hotspotIntensity: formattingSettings.NumUpDown = new formattingSettings.Slider({
         name: "hotspotIntensity",
@@ -319,8 +335,8 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
     hotspotRadius: formattingSettings.NumUpDown = new formattingSettings.Slider({
         name: "hotspotRadius",
         displayName: "Hotspot Radius",
-        description: "Radius of influence for each heat point in pixels",
-        value: 20,
+        description: "Base radius for each heat point in pixels. Lower values = more localized.",
+        value: 8,
         options: {
             maxValue: {
                 type: powerbi.visuals.ValidatorType.Max,
@@ -328,7 +344,7 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
             },
             minValue: {
                 type: powerbi.visuals.ValidatorType.Min,
-                value: 5
+                value: 2
             }
         }
     });
@@ -350,8 +366,8 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
     hotspotBlurAmount: formattingSettings.NumUpDown = new formattingSettings.Slider({
         name: "hotspotBlurAmount",
         displayName: "Blur Amount",
-        description: "Amount of blur/spread for the heat effect (pixels)",
-        value: 15,
+        description: "Amount of blur/glow spread in pixels. Lower values = more focused.",
+        value: 5,
         options: {
             maxValue: {
                 type: powerbi.visuals.ValidatorType.Max,
@@ -405,6 +421,22 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         value: true
     });
 
+    hotspotScalingMethod: DropDown = new DropDown({
+        name: "hotspotScalingMethod",
+        displayName: "Value Scaling",
+        description: "How to scale values for size/opacity. Logarithmic works better with outliers.",
+        value: {
+            value: "logarithmic",
+            displayName: "Logarithmic (Best for outliers)"
+        },
+        items: [
+            { value: "linear", displayName: "Linear" },
+            { value: "logarithmic", displayName: "Logarithmic (Best for outliers)" },
+            { value: "squareRoot", displayName: "Square Root" },
+            { value: "quantile", displayName: "Quantile (Equal distribution)" }
+        ]
+    });
+
     name: string = "proportionalCirclesDisplaySettingsGroup";
     displayName: string = "Display";
     collapsible: boolean = true;
@@ -426,6 +458,7 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         // H3 hexbin settings
         this.h3Resolution,
         this.h3AggregationType,
+        this.h3ScalingMethod,
         this.h3ColorRamp,
         this.h3FillColor,
         this.h3StrokeColor,
@@ -440,7 +473,8 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.hotspotBlurAmount,
         this.hotspotMinOpacity,
         this.hotspotMaxOpacity,
-        this.hotspotScaleByValue
+        this.hotspotScaleByValue,
+        this.hotspotScalingMethod
     ];
 
     /**
@@ -482,6 +516,7 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         // H3 hexbin settings only for H3 display type
         this.h3Resolution.visible = isH3Hexbin;
         this.h3AggregationType.visible = isH3Hexbin;
+        this.h3ScalingMethod.visible = isH3Hexbin;
         this.h3ColorRamp.visible = isH3Hexbin;
         // Show custom fill color only when color ramp is 'custom'
         const isCustomColorRamp = this.h3ColorRamp.value?.value === 'custom';
@@ -500,6 +535,7 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.hotspotMinOpacity.visible = isHotspot;
         this.hotspotMaxOpacity.visible = isHotspot;
         this.hotspotScaleByValue.visible = isHotspot;
+        this.hotspotScalingMethod.visible = isHotspot && this.hotspotScaleByValue.value === true;
     }
 }
 

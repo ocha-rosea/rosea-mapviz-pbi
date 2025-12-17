@@ -8,7 +8,7 @@ import { CircleLayerOptions, GeoJSONFeature, CircleLabelOptions } from '../../ty
 import { DomIds } from "../../constants/strings";
 import { createWebMercatorProjection } from "../../utils/map";
 import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
-import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions } from "../../utils/h3Aggregation";
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions, ScalingMethod, applyScaling } from "../../utils/h3Aggregation";
 
 /**
  * SVG-based circle layer for rendering proportional symbols and pie/donut charts.
@@ -70,7 +70,7 @@ export class CircleSvgLayer extends Layer {
 
         const { combinedCircleSizeValues = [], circle1SizeValues = [], circle2SizeValues = [], circleOptions, minCircleSizeValue = 0, maxCircleSizeValue = 100, circleScale: scaleFactor = 1 } = this.options;
         let { minRadius, color1, color2, layer1Opacity, layer2Opacity, strokeColor, strokeWidth, chartType, enableBlur, blurRadius, enableGlow, glowColor, glowIntensity,
-              hotspotIntensity, hotspotRadius, hotspotColor, hotspotGlowColor, hotspotBlurAmount, hotspotMinOpacity, hotspotMaxOpacity, hotspotScaleByValue } = circleOptions;
+              hotspotIntensity, hotspotRadius, hotspotColor, hotspotGlowColor, hotspotBlurAmount, hotspotMinOpacity, hotspotMaxOpacity, hotspotScaleByValue, hotspotScalingMethod } = circleOptions;
 
         // High contrast mode: override colors with system colors
         if (this.options.isHighContrast && this.options.highContrastColors) {
@@ -200,8 +200,10 @@ export class CircleSvgLayer extends Layer {
                 if (isHotspot) {
                     const baseHotspotR = hotspotRadius || 20;
                     if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
-                        // Scale hotspot size based on data value (between 0.3x and 1.5x base radius)
-                        const normalized = (circle1SizeValues[i] - minCircleSizeValue) / (maxCircleSizeValue - minCircleSizeValue);
+                        // Apply scaling method for better distribution with outliers
+                        const scalingMethod = (hotspotScalingMethod || 'logarithmic') as ScalingMethod;
+                        const normalized = applyScaling(circle1SizeValues[i], minCircleSizeValue, maxCircleSizeValue, scalingMethod, circle1SizeValues);
+                        // Scale hotspot size (between 0.3x and 1.5x base radius)
                         radius1 = baseHotspotR * (0.3 + normalized * 1.2);
                     } else {
                         radius1 = baseHotspotR;
@@ -224,6 +226,16 @@ export class CircleSvgLayer extends Layer {
 
                 // Hotspot rendering - glowing heat points
                 if (isHotspot) {
+                    // Calculate opacity using scaling method
+                    const minOp = (hotspotMinOpacity || 40) / 100;
+                    const maxOp = (hotspotMaxOpacity || 95) / 100;
+                    let pointOpacity = maxOp;
+                    if (hotspotScaleByValue && circle1SizeValues[i] !== undefined && maxCircleSizeValue > minCircleSizeValue) {
+                        const scalingMethod = (hotspotScalingMethod || 'logarithmic') as ScalingMethod;
+                        const normalized = applyScaling(circle1SizeValues[i], minCircleSizeValue, maxCircleSizeValue, scalingMethod, circle1SizeValues);
+                        pointOpacity = minOp + normalized * (maxOp - minOp);
+                    }
+                    
                     const hotspot = circles1Group.append('circle')
                         .attr('cx', x)
                         .attr('cy', y)
@@ -233,7 +245,7 @@ export class CircleSvgLayer extends Layer {
                         .datum(feature.properties.selectionId)
                         .style('cursor', 'pointer')
                         .style('pointer-events', 'all')
-                        .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, d, layer1Opacity));
+                        .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, d, pointOpacity));
 
                     if (feature.properties.tooltip) {
                         this.options.tooltipServiceWrapper.addTooltip(
@@ -766,7 +778,8 @@ export class CircleSvgLayer extends Layer {
             h3StrokeColor = '#ffffff',
             h3StrokeWidth = 1,
             h3MinOpacity = 30,
-            h3MaxOpacity = 90
+            h3MaxOpacity = 90,
+            h3ScalingMethod = 'logarithmic'
         } = circleOptions;
 
         // Remove existing hexbin group
@@ -791,12 +804,14 @@ export class CircleSvgLayer extends Layer {
         const minValue = Math.min(...values);
         const maxValue = Math.max(...values);
 
-        // Prepare color options
+        // Prepare color options with scaling method
         const colorOptions: H3ColorOptions = {
             colorRamp: h3ColorRamp as H3ColorRamp,
             customColor: h3FillColor,
             minOpacity: h3MinOpacity,
-            maxOpacity: h3MaxOpacity
+            maxOpacity: h3MaxOpacity,
+            scalingMethod: h3ScalingMethod as ScalingMethod,
+            allValues: values // Pass all values for quantile calculation
         };
 
         // Render each hexbin as a polygon

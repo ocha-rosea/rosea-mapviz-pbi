@@ -133,6 +133,7 @@ export class OptionsService {
             h3StrokeWidth: circleSettings.proportionalCirclesDisplaySettingsGroup.h3StrokeWidth.value,
             h3MinOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.h3MinOpacity.value,
             h3MaxOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.h3MaxOpacity.value,
+            h3ScalingMethod: circleSettings.proportionalCirclesDisplaySettingsGroup.h3ScalingMethod.value.value.toString(),
             // Hotspot settings
             hotspotIntensity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotIntensity.value,
             hotspotRadius: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotRadius.value,
@@ -141,7 +142,8 @@ export class OptionsService {
             hotspotBlurAmount: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotBlurAmount.value,
             hotspotMinOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotMinOpacity.value,
             hotspotMaxOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotMaxOpacity.value,
-            hotspotScaleByValue: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotScaleByValue.value
+            hotspotScaleByValue: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotScaleByValue.value,
+            hotspotScalingMethod: circleSettings.proportionalCirclesDisplaySettingsGroup.hotspotScalingMethod.value.value.toString()
         };
     }
 
