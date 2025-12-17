@@ -31,6 +31,7 @@
     "@turf/turf": "^7.2.0",
     "chroma-js": "^3.1.2",
     "d3": "7.9.0",
+    "h3-js": "^4.4.0",
     "ol": "^10.3.1",
     "ol-mapbox-style": "^12.4.0",
     "powerbi-visuals-api": "~5.11.0",

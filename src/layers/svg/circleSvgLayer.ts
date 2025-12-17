@@ -8,6 +8,7 @@ import { CircleLayerOptions, GeoJSONFeature, CircleLabelOptions } from '../../ty
 import { DomIds } from "../../constants/strings";
 import { createWebMercatorProjection } from "../../utils/map";
 import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType } from "../../utils/h3Aggregation";
 
 /**
  * SVG-based circle layer for rendering proportional symbols and pie/donut charts.
@@ -81,12 +82,20 @@ export class CircleSvgLayer extends Layer {
 
         // Hotspot mode: auto-enable glow and use hotspot-specific settings
         const isHotspot = chartType === 'hotspot';
+        const isH3Hexbin = chartType === 'h3-hexbin';
+        
         if (isHotspot) {
             enableGlow = true;
             glowIntensity = (hotspotIntensity || 1) * 15; // Scale intensity for glow
             glowColor = glowColor || color1;
             strokeWidth = 0; // No stroke for hotspots
             layer1Opacity = Math.min(1, (hotspotIntensity || 1) * 0.7); // Adjust opacity based on intensity
+        }
+
+        // H3 Hexbin mode: aggregate points and render hexagons
+        if (isH3Hexbin) {
+            this.renderH3Hexbins(frameState, d3Projection, width, height);
+            return this.options.svgContainer;
         }
 
         // Create SVG filter definitions for blur and glow effects
@@ -717,6 +726,112 @@ export class CircleSvgLayer extends Layer {
         const minRadiusSquared = circleOptions.minRadius * circleOptions.minRadius;
         const scaledAreaSquared = minRadiusSquared + (clampedValue - minValue) * scaleFactor;
         return Math.sqrt(scaledAreaSquared);
+    }
+
+    /**
+     * Render H3 hexbin aggregated visualization
+     */
+    private renderH3Hexbins(
+        frameState: FrameState,
+        d3Projection: (coords: [number, number]) => [number, number] | null,
+        width: number,
+        height: number
+    ): void {
+        const { longitudes = [], latitudes = [], circle1SizeValues = [], circleOptions } = this.options;
+        const { h3Resolution = 4, h3AggregationType = 'sum', color1, layer1Opacity, strokeColor, strokeWidth } = circleOptions;
+
+        // Remove existing hexbin group
+        this.svg.select('#h3-hexbins-group').remove();
+        const hexbinGroup = this.svg.append('g').attr('id', 'h3-hexbins-group');
+
+        // Aggregate points to H3 hexbins
+        const hexbins = aggregateToH3Hexbins(
+            longitudes,
+            latitudes,
+            circle1SizeValues.length > 0 ? circle1SizeValues : undefined,
+            {
+                resolution: h3Resolution,
+                aggregationType: h3AggregationType as H3AggregationType
+            }
+        );
+
+        if (hexbins.length === 0) return;
+
+        // Calculate min/max values for color scaling
+        const values = hexbins.map(h => h.value);
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+
+        // Render each hexbin as a polygon
+        hexbins.forEach((hexbin: H3Hexbin) => {
+            // Convert boundary from [lat, lng] to [lng, lat] and project
+            const boundary = boundaryToLngLat(hexbin.boundary);
+            const projectedBoundary = boundary.map(([lng, lat]) => d3Projection([lng, lat]));
+            
+            // Skip if any point fails projection
+            if (projectedBoundary.some(p => p === null)) return;
+            
+            // Create SVG path data
+            const pathData = projectedBoundary
+                .map((p, i) => `${i === 0 ? 'M' : 'L'}${p![0]},${p![1]}`)
+                .join(' ') + ' Z';
+
+            // Get color based on value
+            const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, color1);
+
+            // Create hexbin polygon
+            const hexPath = hexbinGroup.append('path')
+                .attr('d', pathData)
+                .attr('fill', fillColor)
+                .attr('stroke', strokeColor)
+                .attr('stroke-width', strokeWidth)
+                .attr('fill-opacity', layer1Opacity)
+                .style('cursor', 'pointer')
+                .style('pointer-events', 'all');
+
+            // Add tooltip showing aggregated value
+            if (this.options.tooltipServiceWrapper) {
+                const aggregationLabel = h3AggregationType.charAt(0).toUpperCase() + h3AggregationType.slice(1);
+                const tooltipData: powerbi.extensibility.VisualTooltipDataItem[] = [
+                    { displayName: aggregationLabel, value: hexbin.value.toLocaleString() },
+                    { displayName: 'Point Count', value: hexbin.count.toString() }
+                ];
+                
+                this.options.tooltipServiceWrapper.addTooltip(
+                    hexPath,
+                    () => tooltipData,
+                    () => undefined, // No selection for aggregated hexbins
+                    true
+                );
+            }
+
+            // Click handler for selection (select all points in hexbin)
+            if (this.options.allowInteractions !== false && hexbin.pointIndices.length > 0) {
+                hexPath.on('click', (event: MouseEvent) => {
+                    // Select first point in the hexbin as representative
+                    const firstPointIndex = hexbin.pointIndices[0];
+                    const selectionId = this.options.dataPoints?.[firstPointIndex]?.selectionId;
+                    if (selectionId) {
+                        const nativeEvent = event;
+                        this.options.selectionManager.select(selectionId, nativeEvent.ctrlKey || nativeEvent.metaKey)
+                            .then((selectedIds: powerbi.extensibility.ISelectionId[]) => {
+                                this.selectedIds = selectedIds;
+                                this.changed();
+                            });
+                    }
+                });
+
+                hexPath.on('contextmenu', (event: MouseEvent) => {
+                    event.preventDefault();
+                    const firstPointIndex = hexbin.pointIndices[0];
+                    const selectionId = this.options.dataPoints?.[firstPointIndex]?.selectionId;
+                    this.options.selectionManager.showContextMenu(
+                        selectionId ? selectionId : {},
+                        { x: event.clientX, y: event.clientY }
+                    );
+                });
+            }
+        });
     }
 
 }

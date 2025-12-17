@@ -8,6 +8,7 @@ import { getCanvasAndCtx, mercatorProjector } from './canvasUtils';
 import { selectionOpacity } from '../../utils/graphics';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
+import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType } from '../../utils/h3Aggregation';
 
 export class CircleCanvasLayer extends Layer {
   public options: CircleLayerOptions;
@@ -54,6 +55,9 @@ export class CircleCanvasLayer extends Layer {
     glowColor = circleOptions.glowColor || circleOptions.color1;
   }
 
+  // Check for H3 hexbin mode
+  const isH3Hexbin = circleOptions.chartType === 'h3-hexbin';
+
   if (enableGlow) {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = glowIntensity * 2;
@@ -67,6 +71,12 @@ export class CircleCanvasLayer extends Layer {
   } else {
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
+  }
+
+  // H3 Hexbin mode: aggregate points and render hexagons
+  if (isH3Hexbin) {
+    this.renderH3Hexbins(ctx, frameState, width, height);
+    return this.options.svgContainer;
   }
 
     const allRelevantValues = [...combinedCircleSizeValues];
@@ -448,6 +458,125 @@ export class CircleCanvasLayer extends Layer {
     if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return undefined;
     const extent4326: Extent = [minX, minY, maxX, maxY] as any;
     return transformExtent(extent4326, 'EPSG:4326', 'EPSG:3857');
+  }
+
+  /**
+   * Render H3 hexbin aggregated visualization on Canvas
+   */
+  private renderH3Hexbins(
+    ctx: CanvasRenderingContext2D,
+    frameState: FrameState,
+    width: number,
+    height: number
+  ): void {
+    const { longitudes = [], latitudes = [], circle1SizeValues = [], circleOptions } = this.options;
+    const { h3Resolution = 4, h3AggregationType = 'sum', color1, layer1Opacity, strokeColor, strokeWidth } = circleOptions;
+
+    // Create D3 projection for coordinate conversion
+    const d3Projection = createWebMercatorProjection(frameState, width, height);
+
+    // Disable shadow effects for hexbins
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    // Aggregate points to H3 hexbins
+    const hexbins = aggregateToH3Hexbins(
+      longitudes,
+      latitudes,
+      circle1SizeValues.length > 0 ? circle1SizeValues : undefined,
+      {
+        resolution: h3Resolution,
+        aggregationType: h3AggregationType as H3AggregationType
+      }
+    );
+
+    if (hexbins.length === 0) return;
+
+    // Calculate min/max values for color scaling
+    const values = hexbins.map(h => h.value);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+
+    // Remove previous hit overlay
+    this.options.svg.select('#circles-hitlayer').remove();
+    const hitLayer = this.options.svg.append('g').attr('id', 'circles-hitlayer');
+    hitLayer.style('pointer-events', 'all');
+
+    // Render each hexbin as a polygon
+    hexbins.forEach((hexbin: H3Hexbin) => {
+      // Convert boundary from [lat, lng] to [lng, lat] and project
+      const boundary = boundaryToLngLat(hexbin.boundary);
+      const projectedBoundary = boundary.map(([lng, lat]) => d3Projection([lng, lat]));
+
+      // Skip if any point fails projection
+      if (projectedBoundary.some(p => p === null)) return;
+
+      // Draw hexbin polygon on canvas
+      ctx.beginPath();
+      projectedBoundary.forEach((p, i) => {
+        if (i === 0) {
+          ctx.moveTo(p![0], p![1]);
+        } else {
+          ctx.lineTo(p![0], p![1]);
+        }
+      });
+      ctx.closePath();
+
+      // Get color based on value
+      const fillColor = getHexbinColor(hexbin.value, minValue, maxValue, color1);
+      ctx.fillStyle = fillColor;
+      ctx.globalAlpha = layer1Opacity;
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+      ctx.stroke();
+
+      // Create invisible SVG hit target for tooltip/selection
+      const pathData = projectedBoundary
+        .map((p, i) => `${i === 0 ? 'M' : 'L'}${p![0]},${p![1]}`)
+        .join(' ') + ' Z';
+
+      const hit = hitLayer.append('path')
+        .attr('d', pathData)
+        .style('fill', 'transparent')
+        .style('stroke', 'transparent')
+        .style('cursor', 'pointer')
+        .style('pointer-events', 'all');
+
+      // Add tooltip showing aggregated value
+      if (this.options.tooltipServiceWrapper) {
+        const aggregationLabel = h3AggregationType.charAt(0).toUpperCase() + h3AggregationType.slice(1);
+        const tooltipData: powerbi.extensibility.VisualTooltipDataItem[] = [
+          { displayName: aggregationLabel, value: hexbin.value.toLocaleString() },
+          { displayName: 'Point Count', value: hexbin.count.toString() }
+        ];
+
+        this.options.tooltipServiceWrapper.addTooltip(
+          hit as any,
+          () => tooltipData,
+          () => undefined,
+          true
+        );
+      }
+
+      // Click handler for selection
+      if (hexbin.pointIndices.length > 0) {
+        hit.on('click', (event: MouseEvent) => {
+          const firstPointIndex = hexbin.pointIndices[0];
+          const selectionId = this.options.dataPoints?.[firstPointIndex]?.selectionId;
+          if (selectionId) {
+            const nativeEvent = event;
+            this.options.selectionManager.select(selectionId as any, nativeEvent.ctrlKey || nativeEvent.metaKey)
+              .then((selectedIds: powerbi.extensibility.ISelectionId[]) => { 
+                this.selectedIds = selectedIds; 
+                this.changed(); 
+              });
+          }
+        });
+      }
+    });
   }
 }
 
