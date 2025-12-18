@@ -124,6 +124,19 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     }
 
     /**
+     * Disposes of the current choropleth layer and cleans up resources.
+     * Used when layer should be removed (filter returns no data, layer disabled, etc.)
+     */
+    private disposeCurrentLayer(): void {
+        if (this.choroplethLayer) {
+            try { (this.choroplethLayer as any).dispose?.(); } catch {}
+            try { this.map.removeLayer(this.choroplethLayer); } catch {}
+            this.choroplethLayer = undefined;
+        }
+        this.legendService.hideLegend("choropleth");
+    }
+
+    /**
      * Main render method for choropleth visualization.
      * 
      * Orchestrates the full rendering pipeline:
@@ -149,11 +162,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         if (choroplethOptions.layerControl == false) {
             const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
             group.selectAll("*").remove();
-            if (this.choroplethLayer) {
-                this.map.removeLayer(this.choroplethLayer);
-                this.choroplethLayer = undefined;
-            }
-            this.legendService.hideLegend("choropleth");
+            this.disposeCurrentLayer();
             return undefined;
         }
 
@@ -161,13 +170,13 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     group.selectAll("*").remove();
 
     const validation = validateChoroplethInput(categorical);
-    if (!validation.ok) { this.messages.missingMeasures(); return undefined; }
+    if (!validation.ok) { this.disposeCurrentLayer(); this.messages.missingMeasures(); return undefined; }
 
         const { AdminPCodeNameIDCategory, colorMeasure, pCodes } = parseChoroplethCategorical(categorical);
-        if (!AdminPCodeNameIDCategory || !colorMeasure || !pCodes) return undefined;
+        if (!AdminPCodeNameIDCategory || !colorMeasure || !pCodes) { this.disposeCurrentLayer(); return undefined; }
 
     const validPCodes = filterValidPCodes(pCodes);
-    if (validPCodes.length === 0) { this.messages.noValidPCodes(); return undefined; }
+    if (validPCodes.length === 0) { this.disposeCurrentLayer(); this.messages.noValidPCodes(); return undefined; }
 
         const { colorValues, classBreaks, colorScale, pcodeKey, dataPoints } =
             this.prepareChoroplethData(categorical, choroplethOptions, AdminPCodeNameIDCategory, colorMeasure, pCodes, dataService);
