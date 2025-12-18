@@ -4,7 +4,7 @@
         "displayName": "ROSEA MapViz",
         "guid": "roseamapviz83B21535811B48789822ED5224630593",
         "visualClassName": "RoseaMapViz",
-        "version": "0.0.0.31",
+        "version": "0.0.0.30",
         "description": "Minimal Map Visual for Power BI",
         "supportUrl": "https://github.com/IM4SEA/rosea-mapviz-pbi/issues",
         "gitHubUrl": "https://github.com/IM4SEA/rosea-mapviz-pbi"
@@ -22,5 +22,5 @@
     "capabilities": "capabilities.json",
     "dependencies": null,
     "stringResources": [],
-    "version": "0.0.0.31"
+    "version": "0.0.0.30"
 }

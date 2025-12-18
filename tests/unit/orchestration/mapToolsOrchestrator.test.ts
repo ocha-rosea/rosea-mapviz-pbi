@@ -39,7 +39,7 @@ describe('MapToolsOrchestrator', () => {
       legendPosition: 'bottom-left', legendBorderWidth: 1, legendBorderColor: '#000', legendBackgroundColor: '#fff', legendBackgroundOpacity: .5,
       legendBorderRadius: 2, legendBottomMargin: 0, legendTopMargin: 0, legendLeftMargin: 0, legendRightMargin: 0
     } as any, (ext, zoom) => persistCalls.push({ext, zoom}));
-    expect(svc.zoomVisible).toBe(false); // hidden when locked
+    expect(svc.zoomVisible).toBe(true); // zoom control independent of lock state
     expect(map.onCalls.length).toBe(1);
     expect(svc.locked.zoom).toBe(7);
   });

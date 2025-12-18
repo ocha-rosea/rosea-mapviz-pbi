@@ -53,10 +53,9 @@ export class MapToolsOrchestrator {
   public attach(options: MapToolsOptions, persist: (extent: string, zoom: number) => void): void {
     this.mapToolsOptions = options;
 
-    // Toggle zoom control
-    const zoomVisible = this.mapToolsOptions.lockMapExtent ? false : Boolean(this.mapToolsOptions.showZoomControl);
+    // Toggle zoom control - independent of lockMapExtent so users can still zoom on locked maps
+    const zoomVisible = Boolean(this.mapToolsOptions.showZoomControl);
     this.mapService.setZoomControlVisible(zoomVisible);
-    this.mapToolsOptions.showZoomControl = zoomVisible;
 
     if (this.mapToolsOptions.lockMapExtent) {
       if (!this.postRenderHandler) {
