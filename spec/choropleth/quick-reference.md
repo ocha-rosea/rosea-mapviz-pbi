@@ -28,7 +28,7 @@ Required
 2) If GeoBoundaries: Country → Admin level → Release type → Field mapping
     If Custom: URL → Boundary ID field name
 3) Classification: Method + classes, then pick a color ramp (or custom CSV hex)
-4) Rendering engine: SVG, Canvas, or WebGL (preview). In WebGL mode, choropleth renders via Canvas while circles use WebGL when available.
+4) Rendering engine: SVG (default) or Canvas
 5) Performance: set “Simplification Strength” (0–100) for coarser/finer shapes
 
 Minimal settings

@@ -1,8 +1,8 @@
 /**
- * Map Controls Settings Groups
- * 
- * Contains settings for map tools (render engine, zoom controls) and
- * legend container positioning and styling.
+ * Legend Container Visual Card Settings
+ *
+ * Card for legend container positioning and styling options.
+ * Properties are directly on the card (no nested groups).
  */
 
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
@@ -11,105 +11,10 @@ import { LegendPositions } from "../../constants/strings";
 import DropDown = formattingSettings.ItemDropdown;
 
 /**
- * Settings group for map tools configuration.
+ * Card for legend container configuration in the formatting pane.
+ * Contains position, border, background, and margin settings.
  */
-export class MapToolsSettingsGroup extends formattingSettings.SimpleCard {
-    renderEngine: DropDown = new DropDown({
-        name: "renderEngine",
-        displayName: "Render Engine",
-        value: { value: 'svg', displayName: 'SVG' },
-        items: [
-            { value: 'svg', displayName: 'SVG' },
-            { value: 'canvas', displayName: 'Canvas' },
-            { value: 'webgl', displayName: 'WebGL (preview)' }
-        ]
-    });
-
-    lockMapExtent: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
-        name: "lockMapExtent",
-        displayName: "Lock Map Extent",
-        value: false
-    });
-
-    showZoomControl: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
-        name: "showZoomControl",
-        displayName: "Show Zoom Control",
-        value: true
-    });
-
-    lockedMapExtent: formattingSettings.TextInput = new formattingSettings.TextInput({
-        name: "lockedMapExtent",
-        displayName: "Locked Map Extent",
-        value: "",
-        placeholder: "minX,minY,maxX,maxY"
-    });
-
-    lockedMapZoom: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
-        name: "lockedMapZoom",
-        displayName: "Locked Map Zoom",
-        value: null
-    });
-
-    mapFitPaddingTop: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
-        name: "mapFitPaddingTop",
-        displayName: "Fit Padding Top",
-        description: "Padding in pixels from the top edge when auto-fitting to features",
-        value: 0
-    });
-
-    mapFitPaddingRight: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
-        name: "mapFitPaddingRight",
-        displayName: "Fit Padding Right",
-        description: "Padding in pixels from the right edge when auto-fitting to features",
-        value: 30
-    });
-
-    mapFitPaddingBottom: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
-        name: "mapFitPaddingBottom",
-        displayName: "Fit Padding Bottom",
-        description: "Padding in pixels from the bottom edge when auto-fitting to features",
-        value: 0
-    });
-
-    mapFitPaddingLeft: formattingSettings.NumUpDown = new formattingSettings.NumUpDown({
-        name: "mapFitPaddingLeft",
-        displayName: "Fit Padding Left",
-        description: "Padding in pixels from the left edge when auto-fitting to features",
-        value: 30
-    });
-
-    name: string = "mapToolsSettingsGroup";
-    displayName: string = "Map Tools";
-    collapsible: boolean = true;
-    slices: formattingSettings.Slice[] = [
-        this.renderEngine,
-        this.lockMapExtent,
-        this.showZoomControl,
-        this.lockedMapExtent,
-        this.lockedMapZoom,
-        this.mapFitPaddingTop,
-        this.mapFitPaddingRight,
-        this.mapFitPaddingBottom,
-        this.mapFitPaddingLeft
-    ];
-
-    public applyConditionalDisplayRules(): void {
-        this.lockedMapExtent.visible = false;
-        this.lockedMapZoom.visible = false;
-
-        if (this.lockMapExtent.value) {
-            this.showZoomControl.visible = false;
-            this.showZoomControl.value = false;
-        } else {
-            this.showZoomControl.visible = true;
-        }
-    }
-}
-
-/**
- * Settings group for legend container positioning and styling.
- */
-export class LegendContainerSettingsGroup extends formattingSettings.SimpleCard {
+export class LegendContainerVisualCardSettings extends formattingSettings.SimpleCard {
     legendPosition: DropDown = new DropDown({
         name: "legendPosition",
         displayName: "Position",
@@ -241,9 +146,8 @@ export class LegendContainerSettingsGroup extends formattingSettings.SimpleCard 
         }
     });
 
-    name: string = "legendContainerSettingsGroup";
+    name: string = "legendContainerVisualCardSettings";
     displayName: string = "Legend Container";
-    collapsible: boolean = true;
     slices: formattingSettings.Slice[] = [
         this.legendPosition,
         this.legendBorderWidth,
@@ -259,6 +163,12 @@ export class LegendContainerSettingsGroup extends formattingSettings.SimpleCard 
 
     public applyConditionalDisplayRules(): void {
         const position = this.legendPosition.value?.value;
+
+        // Reset visibility
+        this.legendLeftMargin.visible = true;
+        this.legendRightMargin.visible = true;
+        this.legendTopMargin.visible = true;
+        this.legendBottomMargin.visible = true;
 
         if (position === "top-center") {
             this.legendLeftMargin.visible = false;

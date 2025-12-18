@@ -7,4 +7,5 @@
 export { BasemapVisualCardSettings } from "./BasemapCard";
 export { ProportionalCirclesVisualCardSettings } from "./CircleCard";
 export { ChoroplethVisualCardSettings } from "./ChoroplethCard";
-export { MapControlsVisualCardSettings } from "./ControlsCard";
+export { MapToolsVisualCardSettings } from "./MapToolsCard";
+export { LegendContainerVisualCardSettings } from "./LegendContainerCard";

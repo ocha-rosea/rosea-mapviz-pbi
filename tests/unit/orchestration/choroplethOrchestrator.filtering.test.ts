@@ -15,9 +15,6 @@ jest.mock("../../../src/layers/svg/choroplethSvgLayer", () => ({
 jest.mock("../../../src/layers/canvas/choroplethCanvasLayer", () => ({
   ChoroplethCanvasLayer: jest.fn().mockImplementation(() => ({ getFeaturesExtent: jest.fn().mockReturnValue([0,0,1,1]) }))
 }));
-jest.mock("../../../src/layers/webgl/choroplethWebGLLayer", () => ({
-  ChoroplethWebGLLayer: jest.fn().mockImplementation(() => ({ getFeaturesExtent: jest.fn().mockReturnValue([0,0,1,1]) }))
-}));
 
 const mockHost: any = { displayWarningIcon: jest.fn(), createSelectionIdBuilder: () => ({ withCategory: () => ({ withMeasure: () => ({ createSelectionId: () => ({}) }) }) }) };
 const mockMap: any = { addLayer: jest.fn(), removeLayer: jest.fn(), getView: () => ({ fit: jest.fn() }) };

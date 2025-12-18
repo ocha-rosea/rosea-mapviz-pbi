@@ -7,7 +7,6 @@ import Map from "ol/Map";
 import { ChoroplethDataService } from "../services/ChoroplethDataService";
 import { LegendService } from "../services/LegendService";
 import { ChoroplethSvgLayer } from "../layers/svg/choroplethSvgLayer";
-import { ChoroplethWebGLLayer } from "../layers/webgl/choroplethWebGLLayer";
 import { ChoroplethData, ChoroplethDataSet, ChoroplethLayerOptions, ChoroplethOptions, MapToolsOptions, PreparedGeometry } from "../types";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
@@ -42,7 +41,7 @@ import { UniqueClassificationService } from "../services/UniqueClassificationSer
  */
 export class ChoroplethOrchestrator extends BaseOrchestrator {
     private cacheService: CacheService;
-    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | ChoroplethVectorTileLayer | undefined;
+    private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethVectorTileLayer | undefined;
     private abortController: AbortController | null = null;
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
     private uniqueClassification: UniqueClassificationService;
@@ -108,9 +107,9 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     /**
      * Returns the current choropleth layer instance if one exists.
      * 
-     * @returns The active choropleth layer (Canvas, WebGL, SVG, or VectorTile), or undefined if not rendered
+     * @returns The active choropleth layer (Canvas, SVG, or VectorTile), or undefined if not rendered
      */
-    public getLayer(): ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | ChoroplethVectorTileLayer | undefined {
+    public getLayer(): ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethVectorTileLayer | undefined {
         return this.choroplethLayer as any;
     }
 
@@ -146,7 +145,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         choroplethOptions: ChoroplethOptions,
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions
-    ): Promise<ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethWebGLLayer | undefined> {
+    ): Promise<ChoroplethSvgLayer | ChoroplethCanvasLayer | undefined> {
         if (choroplethOptions.layerControl == false) {
             const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
             group.selectAll("*").remove();
@@ -654,7 +653,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
      * Disposes of any existing layer before creating a new one.
      * 
      * @param layerOptions - Configuration options for the choropleth layer
-     * @param mapToolsOptions - Map tools configuration including render engine ('webgl', 'canvas', or 'svg')
+     * @param mapToolsOptions - Map tools configuration including render engine ('canvas' or 'svg')
      */
     private renderChoroplethLayerOnMap(
         layerOptions: ChoroplethLayerOptions,
@@ -664,15 +663,11 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             try { (this.choroplethLayer as any).dispose?.(); } catch {}
             this.map.removeLayer(this.choroplethLayer);
         }
-        // Use WebGL vector layer for choropleth when engine is 'webgl' and geojson is valid
-        const hasValidGeoJSON = !!(layerOptions as any)?.geojson && !!(layerOptions as any)?.geojson?.type;
-        this.choroplethLayer = mapToolsOptions.renderEngine === 'webgl'
-            ? (hasValidGeoJSON ? new ChoroplethWebGLLayer(layerOptions) : new ChoroplethCanvasLayer(layerOptions))
-            : mapToolsOptions.renderEngine === 'canvas'
-                ? new ChoroplethCanvasLayer(layerOptions)
-                : new ChoroplethSvgLayer(layerOptions);
-    this.map.addLayer(this.choroplethLayer);
-    try { (this.choroplethLayer as any).attachHitLayer?.(this.map); } catch {}
+        this.choroplethLayer = mapToolsOptions.renderEngine === 'canvas'
+            ? new ChoroplethCanvasLayer(layerOptions)
+            : new ChoroplethSvgLayer(layerOptions);
+        this.map.addLayer(this.choroplethLayer);
+        try { (this.choroplethLayer as any).attachHitLayer?.(this.map); } catch {}
         if (mapToolsOptions.lockMapExtent === false) {
             const anyLayer: any = this.choroplethLayer as any;
             const extent = anyLayer?.getFeaturesExtent?.();

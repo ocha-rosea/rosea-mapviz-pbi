@@ -61,7 +61,7 @@ export class ChoroplethCanvasLayer extends Layer {
     const width = frameState.size[0];
     const height = frameState.size[1];
 
-    // Place choropleth canvas inside the map viewport so WebGL circles (map layer) can render above it
+    // Place choropleth canvas inside the map viewport so circle layers can render above it
     const map: any = (this as any).getMap?.();
     const container: HTMLElement = map?.getViewport?.() || this.options.svgContainer;
     const { canvas, ctx, dpr } = getCanvasAndCtx(container, width, height, 'choropleth-canvas');

@@ -61,7 +61,7 @@ export class StateManager {
     public persistLockedExtent(extentString: string, zoom: number): void {
         this.host.persistProperties({
             merge: [{
-                objectName: VisualObjectNames.MapControls,
+                objectName: VisualObjectNames.MapTools,
                 properties: { 
                     [VisualObjectProps.LockedMapExtent]: extentString, 
                     [VisualObjectProps.LockedMapZoom]: zoom 

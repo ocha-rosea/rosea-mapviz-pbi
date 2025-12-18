@@ -56,7 +56,8 @@ export {
     BasemapVisualCardSettings,
     ProportionalCirclesVisualCardSettings,
     ChoroplethVisualCardSettings,
-    MapControlsVisualCardSettings
+    MapToolsVisualCardSettings,
+    LegendContainerVisualCardSettings
 } from "./settings/cards";
 
 // Re-export all settings groups for direct access if needed
@@ -71,8 +72,5 @@ export {
     // Choropleth groups
     ChoroplethLocationBoundarySettingsGroup,
     ChoroplethClassificationSettingsGroup,
-    ChoroplethLegendSettingsGroup,
-    // Controls groups
-    MapToolsSettingsGroup,
-    LegendContainerSettingsGroup
+    ChoroplethLegendSettingsGroup
 } from "./settings/groups";

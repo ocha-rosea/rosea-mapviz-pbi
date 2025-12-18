@@ -2,25 +2,27 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 // @ts-ignore internal import
 import { RoseaMapVizFormattingSettingsModel } from '../../../src/settings';
 
-describe('mapToolsSettingsGroup.applyConditionalDisplayRules', () => {
-  let group: any;
+describe('mapToolsVisualCardSettings.applyConditionalDisplayRules', () => {
+  let card: any;
   beforeEach(() => {
     const model = new RoseaMapVizFormattingSettingsModel();
-    group = model.mapControlsVisualCardSettings.mapToolsSettingsGroup;
+    card = model.mapToolsVisualCardSettings;
   });
 
-  it('hides locked extent & zoom', () => {
-    group.lockMapExtent.value = false;
-    group.applyConditionalDisplayRules();
-    expect(group.lockedMapExtent.visible).toBe(false);
-    expect(group.lockedMapZoom.visible).toBe(false);
+  it('hides locked extent & zoom storage fields', () => {
+    card.lockMapExtent.value = false;
+    card.applyConditionalDisplayRules();
+    expect(card.lockedMapExtent.visible).toBe(false);
+    expect(card.lockedMapZoom.visible).toBe(false);
   });
 
-  it('disables zoom control when lock extent', () => {
-    group.lockMapExtent.value = true;
-    group.showZoomControl.value = true;
-    group.applyConditionalDisplayRules();
-    expect(group.showZoomControl.visible).toBe(false);
-    expect(group.showZoomControl.value).toBe(false);
+  it('keeps zoom control toggle visible when lock extent is enabled', () => {
+    card.lockMapExtent.value = true;
+    card.showZoomControl.value = true;
+    card.applyConditionalDisplayRules();
+    // Zoom control toggle should remain visible (not hidden when locked)
+    expect(card.showZoomControl.visible).not.toBe(false);
+    // User's choice should be preserved
+    expect(card.showZoomControl.value).toBe(true);
   });
 });

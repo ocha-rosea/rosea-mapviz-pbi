@@ -1,7 +1,7 @@
 /**
  * GeometrySimplificationService
  * 
- * Centralized geometry simplification for consistent rendering across all engines (SVG, Canvas, WebGL).
+ * Centralized geometry simplification for consistent rendering across all engines (SVG, Canvas).
  * 
  * Design Principles:
  * 1. Preserve 1-1 feature mapping with Power BI data rows

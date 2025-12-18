@@ -22,7 +22,7 @@ Required
 1) Chart type — nested-circles | donut-chart | pie-chart | **hotspot** | **h3-hexbin**
 2) Appearance — min/max radius, colors, stroke, opacities
 3) Legend — show, title, spacing, item stroke
-4) Rendering engine — SVG, Canvas, or WebGL (preview). Falls back to Canvas if WebGL is unavailable.
+4) Rendering engine — SVG (default) or Canvas
 
 Minimal settings
 ```

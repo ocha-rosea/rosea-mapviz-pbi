@@ -15,14 +15,16 @@ import {
     BasemapVisualCardSettings,
     ProportionalCirclesVisualCardSettings,
     ChoroplethVisualCardSettings,
-    MapControlsVisualCardSettings
+    MapToolsVisualCardSettings,
+    LegendContainerVisualCardSettings
 } from "./cards";
 
 /**
  * Main formatting settings model for the ROSEA MapViz visual.
  * 
  * Contains all formatting cards that appear in the Power BI formatting pane:
- * - Controls (map tools, legend container)
+ * - Map Tools (render engine, zoom controls, lock extent, fit padding)
+ * - Legend Container (position, border, background, margins)
  * - Basemap (provider selection, styles)
  * - Scaled Circles (proportional circles display and legend)
  * - Choropleth (boundary, classification, display, legend)
@@ -32,10 +34,12 @@ export class RoseaMapVizFormattingSettingsModel extends FormattingSettingsModel 
     BasemapVisualCardSettings = new BasemapVisualCardSettings();
     ProportionalCirclesVisualCardSettings = new ProportionalCirclesVisualCardSettings();
     ChoroplethVisualCardSettings = new ChoroplethVisualCardSettings();
-    mapControlsVisualCardSettings = new MapControlsVisualCardSettings();
+    mapToolsVisualCardSettings = new MapToolsVisualCardSettings();
+    legendContainerVisualCardSettings = new LegendContainerVisualCardSettings();
 
     cards = [
-        this.mapControlsVisualCardSettings,
+        this.mapToolsVisualCardSettings,
+        this.legendContainerVisualCardSettings,
         this.BasemapVisualCardSettings,
         this.ProportionalCirclesVisualCardSettings,
         this.ChoroplethVisualCardSettings

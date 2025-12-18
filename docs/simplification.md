@@ -26,11 +26,11 @@ Simplification is handled by the **GeometrySimplificationService** (`src/service
 │  │  4. Return PreparedGeometry                              │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                              │                                   │
-│              ┌───────────────┼───────────────┐                  │
-│              ▼               ▼               ▼                  │
-│     ┌────────────┐   ┌────────────┐   ┌────────────┐           │
-│     │ SVG Layer  │   │Canvas Layer│   │WebGL Layer │           │
-│     └────────────┘   └────────────┘   └────────────┘           │
+│              ┌───────────────┴───────────────┐                  │
+│              ▼                               ▼                  │
+│     ┌────────────┐                   ┌────────────┐            │
+│     │ SVG Layer  │                   │Canvas Layer│            │
+│     └────────────┘                   └────────────┘            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,26 +134,6 @@ render(frameState: FrameState) {
 ```
 
 **Simplification**: None performed at render time. Uses orchestrator-provided geometry.
-
-### WebGL Engine
-
-The WebGL engine uses OpenLayers' `WebGLVectorLayer`:
-
-```typescript
-// OpenLayers handles its own optimizations
-this.vectorSource = new VectorSource({
-  features: new GeoJSON().readFeatures(options.geojson, {
-    featureProjection: 'EPSG:3857'
-  })
-});
-
-this.layer = new WebGLVectorLayer({
-  source: this.vectorSource,
-  style: { /* ... */ }
-});
-```
-
-**Simplification**: OpenLayers performs internal optimizations for WebGL rendering. The input geometry is still pre-simplified by the orchestrator.
 
 ## Data Source Handling
 

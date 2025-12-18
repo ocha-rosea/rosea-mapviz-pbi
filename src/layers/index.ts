@@ -8,7 +8,6 @@
  * ```typescript
  * import { CircleLayer, ChoroplethLayer } from './layers';
  * import { CircleCanvasLayer } from './layers/canvas';
- * import { ChoroplethWebGLLayer } from './layers/webgl';
  * import { ChoroplethVectorTileLayer } from './layers/vectortile';
  * ```
  */
@@ -21,10 +20,6 @@ export { ChoroplethSvgLayer, ChoroplethLayer } from "./svg/choroplethSvgLayer";
 export { CircleCanvasLayer } from "./canvas/circleCanvasLayer";
 export { ChoroplethCanvasLayer } from "./canvas/choroplethCanvasLayer";
 export * from "./canvas/canvasUtils";
-
-// WebGL-based layers
-export { CircleWebGLLayer } from "./webgl/circleWebGLLayer";
-export { ChoroplethWebGLLayer } from "./webgl/choroplethWebGLLayer";
 
 // Vector Tile layers (for Mapbox tilesets)
 export { ChoroplethVectorTileLayer } from "./vectortile/choroplethVectorTileLayer";

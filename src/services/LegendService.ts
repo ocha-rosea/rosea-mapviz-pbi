@@ -924,4 +924,98 @@ export class LegendService {
         let b = bigint & 255;
         return `rgba(${r},${g},${b},${opacity})`;
     }
+
+    /**
+     * Creates a gradient legend for H3 hexbin or hotspot visualizations.
+     * Shows a continuous color gradient bar with Low/High labels.
+     * @param title - Legend title text
+     * @param colors - Array of colors for the gradient (typically 3: start, middle, end)
+     * @param titleColor - Color for the title text
+     * @param labelColor - Color for the Low/High labels
+     * @param minLabel - Label for minimum value (default: "Low")
+     * @param maxLabel - Label for maximum value (default: "High")
+     */
+    createGradientLegend(
+        title: string,
+        colors: string[],
+        titleColor: string = "#000000",
+        labelColor: string = "#000000",
+        minLabel: string = "Low",
+        maxLabel: string = "High"
+    ): void {
+        // Use circle legend container for gradient legends (H3/hotspot are circle chart types)
+        if (!this.circleLegendContainer) {
+            this.circleLegendContainer = document.createElement("div");
+            this.mainContainer.appendChild(this.circleLegendContainer);
+        } else {
+            this.clearContainer(this.circleLegendContainer);
+        }
+
+        // Configure container layout
+        this.circleLegendContainer.style.display = "flex";
+        this.circleLegendContainer.style.flexDirection = "column";
+        this.circleLegendContainer.style.alignItems = "flex-start";
+        this.circleLegendContainer.style.padding = "8px";
+        this.circleLegendContainer.style.minWidth = "80px";
+        this.circleLegendContainer.style.maxWidth = "150px";
+
+        // Create legend content container
+        const contentContainer = document.createElement("div");
+        contentContainer.style.display = "flex";
+        contentContainer.style.flexDirection = "column";
+        contentContainer.style.alignItems = "stretch";
+        contentContainer.style.width = "100%";
+        this.circleLegendContainer.appendChild(contentContainer);
+
+        // Add title
+        const titleElement = document.createElement("div");
+        titleElement.textContent = title;
+        titleElement.style.color = titleColor;
+        titleElement.style.fontSize = "12px";
+        titleElement.style.fontWeight = "bold";
+        titleElement.style.marginBottom = "8px";
+        contentContainer.appendChild(titleElement);
+
+        // Create gradient bar container
+        const gradientContainer = document.createElement("div");
+        gradientContainer.style.display = "flex";
+        gradientContainer.style.flexDirection = "row";
+        gradientContainer.style.alignItems = "center";
+        gradientContainer.style.gap = "6px";
+        gradientContainer.style.width = "100%";
+        contentContainer.appendChild(gradientContainer);
+
+        // Low label
+        const lowLabel = document.createElement("span");
+        lowLabel.textContent = minLabel;
+        lowLabel.style.fontSize = "10px";
+        lowLabel.style.color = labelColor;
+        lowLabel.style.whiteSpace = "nowrap";
+        gradientContainer.appendChild(lowLabel);
+
+        // Gradient bar
+        const gradientBar = document.createElement("div");
+        gradientBar.style.flex = "1";
+        gradientBar.style.height = "12px";
+        gradientBar.style.borderRadius = "2px";
+        gradientBar.style.border = "1px solid #ccc";
+        
+        // Build gradient string from colors array
+        if (colors.length >= 3) {
+            gradientBar.style.background = `linear-gradient(to right, ${colors[0]}, ${colors[1]}, ${colors[2]})`;
+        } else if (colors.length === 2) {
+            gradientBar.style.background = `linear-gradient(to right, ${colors[0]}, ${colors[1]})`;
+        } else if (colors.length === 1) {
+            gradientBar.style.background = colors[0];
+        }
+        gradientContainer.appendChild(gradientBar);
+
+        // High label
+        const highLabel = document.createElement("span");
+        highLabel.textContent = maxLabel;
+        highLabel.style.fontSize = "10px";
+        highLabel.style.color = labelColor;
+        highLabel.style.whiteSpace = "nowrap";
+        gradientContainer.appendChild(highLabel);
+    }
 }

@@ -10,7 +10,6 @@ import { LegendService, CircleMeasureLegendEntry } from "../services/LegendServi
 import { CircleSvgLayer } from "../layers/svg/circleSvgLayer";
 import { CircleCanvasLayer } from "../layers/canvas/circleCanvasLayer";
 import { CircleData, CircleLabelOptions, CircleLayerOptions, CircleOptions, MapToolsOptions } from "../types";
-import { CircleWebGLLayer } from "../layers/webgl/circleWebGLLayer";
 import { ITooltipServiceWrapper } from "powerbi-visuals-utils-tooltiputils";
 import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.extensibility.ISelectionId;
@@ -25,7 +24,7 @@ import { BaseOrchestrator } from "./BaseOrchestrator";
  * Orchestrator for scaled circle (proportional symbol) visualizations.
  * 
  * Manages the rendering of circle markers on the map where circle size represents
- * data values. Supports multiple rendering engines (SVG, Canvas, WebGL) and
+ * data values. Supports multiple rendering engines (SVG, Canvas) and
  * chart types (simple circles, pie charts, donut charts).
  * 
  * @extends BaseOrchestrator
@@ -38,8 +37,8 @@ import { BaseOrchestrator } from "./BaseOrchestrator";
 export class CircleOrchestrator extends BaseOrchestrator {
     /** Builder for constructing circle layer options */
     private circleOptsBuilder: CircleLayerOptionsBuilder;
-    /** Current circle layer instance (SVG, Canvas, or WebGL) */
-    private circleLayer: CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined;
+    /** Current circle layer instance (SVG or Canvas) */
+    private circleLayer: CircleSvgLayer | CircleCanvasLayer | undefined;
 
     /**
      * Creates a new CircleOrchestrator.
@@ -92,7 +91,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
      * 
      * @returns The active circle layer or undefined if not rendered
      */
-    public getLayer(): CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
+    public getLayer(): CircleSvgLayer | CircleCanvasLayer | undefined {
         return this.circleLayer;
     }
 
@@ -126,7 +125,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
         mapToolsOptions: MapToolsOptions,
         choroplethDisplayed: boolean,
         labelOptions?: CircleLabelOptions
-    ): CircleSvgLayer | CircleCanvasLayer | CircleWebGLLayer | undefined {
+    ): CircleSvgLayer | CircleCanvasLayer | undefined {
         if (circleOptions.layerControl == false) {
             const group1 = this.svg.select(`#${DomIds.CirclesGroup1}`);
             const group2 = this.svg.select(`#${DomIds.CirclesGroup2}`);
@@ -172,7 +171,9 @@ export class CircleOrchestrator extends BaseOrchestrator {
         }
 
         // Build label values based on labelSource option
-        const labelValues = this.buildLabelValues(labelOptions, {
+        // Labels are disabled for H3 hexbin and hotspot chart types as they use aggregated data
+        const isAggregatedChartType = circleOptions.chartType === 'h3-hexbin' || circleOptions.chartType === 'hotspot';
+        const labelValues = isAggregatedChartType ? undefined : this.buildLabelValues(labelOptions, {
             locationIds,
             circle1SizeValues: circleSizeValuesObjects[0]?.values as number[] | undefined,
             circle2SizeValues: circleSizeValuesObjects[1]?.values as number[] | undefined,
@@ -195,6 +196,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             dataPoints,
             circle1SizeValues: circleSizeValuesObjects[0]?.values as number[],
             circle2SizeValues: circleSizeValuesObjects[1]?.values as number[],
+            sizeMeasureName: circleSizeValuesObjects[0]?.source?.displayName,
             labelValues,
             labelOptions,
         });
@@ -207,17 +209,25 @@ export class CircleOrchestrator extends BaseOrchestrator {
         const circleLegendTitle = this.buildCircleLegendTitle(circleSizeValuesObjects);
 
         if (circleOptions.showLegend) {
-            this.renderCircleLegend(
-                combinedCircleSizeValues,
-                circleSizeValuesObjects.length,
-                minCircleSizeValue,
-                maxCircleSizeValue,
-                circleScale,
-                selectedScalingMethod,
-                circleOptions,
-                circleMeasureLegendEntries,
-                circleLegendTitle
-            );
+            const isGradientLegendType = circleOptions.chartType === 'h3-hexbin' || circleOptions.chartType === 'hotspot';
+            
+            if (isGradientLegendType) {
+                // Use gradient legend for H3 hexbin and hotspot
+                this.renderGradientLegend(circleOptions, circleLegendTitle);
+            } else {
+                // Use proportional circle legend for standard chart types
+                this.renderCircleLegend(
+                    combinedCircleSizeValues,
+                    circleSizeValuesObjects.length,
+                    minCircleSizeValue,
+                    maxCircleSizeValue,
+                    circleScale,
+                    selectedScalingMethod,
+                    circleOptions,
+                    circleMeasureLegendEntries,
+                    circleLegendTitle
+                );
+            }
         } else {
             this.legendService.hideLegend("circle");
         }
@@ -297,7 +307,6 @@ export class CircleOrchestrator extends BaseOrchestrator {
 
     /**
      * Renders the circle layer on the map with the appropriate rendering engine.
-     * Automatically falls back to Canvas for pie/donut charts when WebGL is selected.
      * 
      * @param circleLayerOptions - Configuration options for the circle layer
      * @param mapToolsOptions - Map tools configuration including render engine
@@ -308,18 +317,11 @@ export class CircleOrchestrator extends BaseOrchestrator {
             try { (this.circleLayer as any).dispose?.(); } catch {}
             this.map.removeLayer(this.circleLayer);
         }
-    const engine = mapToolsOptions.renderEngine;
-    const chartType = circleLayerOptions.circleOptions?.chartType;
-        const needCanvasForCharts = chartType === 'pie-chart' || chartType === 'donut-chart';
-        // Fallback to Canvas for pies/donuts in WebGL mode (WebGLVectorLayer doesn't support sector drawing)
-        this.circleLayer = engine === 'webgl'
-            ? (needCanvasForCharts ? new CircleCanvasLayer(circleLayerOptions) : new CircleWebGLLayer(circleLayerOptions))
-            : engine === 'canvas'
-                ? new CircleCanvasLayer(circleLayerOptions)
-                : new CircleSvgLayer(circleLayerOptions);
-    this.map.addLayer(this.circleLayer);
-    // Attach hit overlay for WebGL only
-    try { (this.circleLayer as any).attachHitLayer?.(this.map); } catch {}
+        const engine = mapToolsOptions.renderEngine;
+        this.circleLayer = engine === 'canvas'
+            ? new CircleCanvasLayer(circleLayerOptions)
+            : new CircleSvgLayer(circleLayerOptions);
+        this.map.addLayer(this.circleLayer);
 
         if (choroplethDisplayed === false && mapToolsOptions.lockMapExtent === false) {
             const anyLayer: any = this.circleLayer as any;
@@ -414,6 +416,74 @@ export class CircleOrchestrator extends BaseOrchestrator {
         );
 
         this.legendService.showLegend("circle");
+    }
+
+    /**
+     * Renders a gradient legend for H3 hexbin and hotspot chart types.
+     * Shows a continuous color gradient bar with Low/High labels.
+     * 
+     * @param circleOptions - Circle configuration options
+     * @param legendTitle - Optional legend title from measure display names
+     */
+    private renderGradientLegend(
+        circleOptions: CircleOptions,
+        legendTitle?: string
+    ): void {
+        const title = legendTitle || circleOptions.legendTitle || "Values";
+        let colors: string[];
+
+        if (circleOptions.chartType === 'h3-hexbin') {
+            // Use H3 color ramp or custom colors
+            if (circleOptions.h3ColorRamp === 'custom') {
+                colors = [
+                    circleOptions.h3FillColor,
+                    circleOptions.h3FillColorMiddle,
+                    circleOptions.h3FillColorEnd
+                ];
+            } else {
+                // Get colors from predefined color ramps
+                colors = this.getColorRampColors(circleOptions.h3ColorRamp);
+            }
+        } else {
+            // Hotspot: use hotspot colors
+            colors = [
+                '#ffffff', // Low (transparent to colored)
+                circleOptions.hotspotColor,
+                circleOptions.hotspotGlowColor || circleOptions.hotspotColor
+            ];
+        }
+
+        this.legendService.createGradientLegend(
+            title,
+            colors,
+            circleOptions.legendTitleColor,
+            circleOptions.labelTextColor
+        );
+
+        this.legendService.showLegend("circle");
+    }
+
+    /**
+     * Returns sample colors for predefined color ramps.
+     * Used for gradient legend display.
+     * 
+     * @param rampName - Name of the color ramp
+     * @returns Array of 3 colors representing start, middle, end
+     */
+    private getColorRampColors(rampName: string): string[] {
+        const colorRamps: Record<string, string[]> = {
+            'viridis': ['#440154', '#21918c', '#fde725'],
+            'plasma': ['#0d0887', '#cc4778', '#f0f921'],
+            'inferno': ['#000004', '#bb3754', '#fcffa4'],
+            'magma': ['#000004', '#b73779', '#fcfdbf'],
+            'warm': ['#6e40aa', '#ff5e63', '#aff05b'],
+            'cool': ['#6e40aa', '#28bbec', '#aff05b'],
+            'blues': ['#f7fbff', '#6baed6', '#08306b'],
+            'greens': ['#f7fcf5', '#74c476', '#00441b'],
+            'reds': ['#fff5f0', '#fb6a4a', '#67000d'],
+            'oranges': ['#fff5eb', '#fd8d3c', '#7f2704']
+        };
+        return colorRamps[rampName] || colorRamps['viridis'];
     }
 
     /**

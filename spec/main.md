@@ -9,7 +9,7 @@ Quick, diagram-first overview. Use the quick references when building, and the f
 - **Scaling methods**: Linear, Logarithmic, Square Root, Quantile for outlier handling.
 - Choropleth: GeoBoundaries or custom Geo/TopoJSON. Equal interval, quantile, or natural breaks.
 - Basemaps: OSM, Mapbox, MapTiler, or none. Zoom controls optional.
-- Rendering: SVG (default), Canvas (fast), WebGL preview for circles with automatic fallback.
+- Rendering: SVG (default) or Canvas (fast).
 - Network: HTTPS-only boundary fetch, open-redirect guard, 25s timeout, caching.
 
 Docs
@@ -54,7 +54,7 @@ flowchart LR
 ## Tips
 - Custom color ramps: comma-separated hex (e.g., #fee,#f55,#900).
 - Zoom-to-layer works for all engines; disable via “Lock map extent”.
-- WebGL mode: circles use WebGL when available; choropleth renders via Canvas.
+
 
 ## Credentials
 - Mapbox basemap: bind the **Mapbox Access Token** data role (single text value via parameter/measure) or use the format pane token. If the data role is populated, it takes precedence and the format input hides automatically.

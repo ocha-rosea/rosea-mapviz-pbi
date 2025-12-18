@@ -265,6 +265,8 @@ export interface CircleLayerOptions extends LayerOptions {
     combinedCircleSizeValues?: number[];
     circle1SizeValues?: number[];
     circle2SizeValues?: number[];
+    /** Display name of the size measure (for tooltip labels) */
+    sizeMeasureName?: string;
     minCircleSizeValue?: number;
     maxCircleSizeValue?: number;
     circleScale?: number;
@@ -402,7 +404,9 @@ export interface CircleOptions {
     h3Resolution: number;
     h3AggregationType: string; // "sum" | "count" | "average" | "min" | "max"
     h3ColorRamp: string; // "viridis" | "plasma" | "inferno" | "magma" | "warm" | "cool" | "blues" | "greens" | "reds" | "oranges" | "custom"
-    h3FillColor: string; // Custom fill color when h3ColorRamp is "custom"
+    h3FillColor: string; // Custom gradient start color (Low)
+    h3FillColorMiddle: string; // Custom gradient middle color
+    h3FillColorEnd: string; // Custom gradient end color (High)
     h3StrokeColor: string;
     h3StrokeWidth: number;
     h3MinOpacity: number; // 0-100
@@ -561,7 +565,7 @@ export interface HeatmapOptions {
 export interface MapToolsOptions {
     lockMapExtent: boolean;
     showZoomControl: boolean;
-    renderEngine?: 'svg' | 'canvas' | 'webgl';
+    renderEngine?: 'svg' | 'canvas';
 
     lockedMapExtent: string; // Stores the locked map extent as a comma-separated string: "minX,minY,maxX,maxY"
     lockedMapZoom?: number; // Stores the locked map zoom level

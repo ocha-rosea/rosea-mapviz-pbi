@@ -26,8 +26,5 @@ export {
     ChoroplethNestedGeometrySettingsGroup
 } from "./ChoroplethGroups";
 
-// Map controls settings groups
-export {
-    MapToolsSettingsGroup,
-    LegendContainerSettingsGroup
-} from "./ControlsGroups";
+// Note: Map tools and Legend Container settings are now directly on the cards
+// (MapToolsVisualCardSettings, LegendContainerVisualCardSettings) not nested groups

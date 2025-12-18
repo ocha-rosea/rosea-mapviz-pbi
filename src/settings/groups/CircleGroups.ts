@@ -179,7 +179,7 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
     h3Resolution: formattingSettings.NumUpDown = new formattingSettings.Slider({
         name: "h3Resolution",
         displayName: "H3 Resolution",
-        description: "H3 hexbin resolution (0=largest, 15=smallest). Lower values create larger hexbins.",
+        description: "H3 hexbin resolution level (0-15). Approx sizes: 0=1100km, 3=60km, 5=8km, 7=1.2km, 9=175m, 12=9m",
         value: 4,
         options: {
             maxValue: {
@@ -229,15 +229,29 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
             { value: "greens", displayName: "Greens" },
             { value: "reds", displayName: "Reds" },
             { value: "oranges", displayName: "Oranges" },
-            { value: "custom", displayName: "Custom (Single Color)" }
+            { value: "custom", displayName: "Custom Gradient" }
         ]
     });
 
     h3FillColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
         name: "h3FillColor",
-        displayName: "Custom Fill Color",
-        description: "Base fill color when using custom color mode",
-        value: { value: "#3182bd" }
+        displayName: "Start Color (Low)",
+        description: "Color for lowest values in custom gradient",
+        value: { value: "#ffffcc" }
+    });
+
+    h3FillColorMiddle: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "h3FillColorMiddle",
+        displayName: "Middle Color",
+        description: "Color for mid-range values in custom gradient",
+        value: { value: "#fd8d3c" }
+    });
+
+    h3FillColorEnd: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
+        name: "h3FillColorEnd",
+        displayName: "End Color (High)",
+        description: "Color for highest values in custom gradient",
+        value: { value: "#800026" }
     });
 
     h3StrokeColor: formattingSettings.ColorPicker = new formattingSettings.ColorPicker({
@@ -461,6 +475,8 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.h3ScalingMethod,
         this.h3ColorRamp,
         this.h3FillColor,
+        this.h3FillColorMiddle,
+        this.h3FillColorEnd,
         this.h3StrokeColor,
         this.h3StrokeWidth,
         this.h3MinOpacity,
@@ -518,9 +534,11 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
         this.h3AggregationType.visible = isH3Hexbin;
         this.h3ScalingMethod.visible = isH3Hexbin;
         this.h3ColorRamp.visible = isH3Hexbin;
-        // Show custom fill color only when color ramp is 'custom'
+        // Show custom gradient color pickers only when color ramp is 'custom'
         const isCustomColorRamp = this.h3ColorRamp.value?.value === 'custom';
         this.h3FillColor.visible = isH3Hexbin && isCustomColorRamp;
+        this.h3FillColorMiddle.visible = isH3Hexbin && isCustomColorRamp;
+        this.h3FillColorEnd.visible = isH3Hexbin && isCustomColorRamp;
         this.h3StrokeColor.visible = isH3Hexbin;
         this.h3StrokeWidth.visible = isH3Hexbin;
         this.h3MinOpacity.visible = isH3Hexbin;
@@ -543,6 +561,9 @@ export class ProportionalCirclesDisplaySettingsGroup extends formattingSettings.
  * Settings group for proportional circles legend configuration.
  */
 export class ProportionalCirclesLegendSettingsGroup extends formattingSettings.SimpleCard {
+    // Track current chart type for conditional visibility
+    private _chartType: string = "nested-circle";
+
     showLegend: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
         name: "showLegend",
         displayName: "Show Legend",
@@ -694,6 +715,35 @@ export class ProportionalCirclesLegendSettingsGroup extends formattingSettings.S
         this.xPadding,
         this.yPadding
     ];
+
+    /**
+     * Sets the current chart type for conditional visibility rules.
+     * @param chartType - The selected chart type from display settings
+     */
+    public setChartType(chartType: string): void {
+        this._chartType = chartType;
+    }
+
+    /**
+     * Apply conditional visibility rules based on chart type.
+     * Circle-specific legend settings are hidden for H3 hexbin and hotspot chart types
+     * since these use a gradient legend instead of proportional circle legend.
+     */
+    public applyConditionalDisplayRules(): void {
+        const isGradientLegendType = this._chartType === "h3-hexbin" || this._chartType === "hotspot";
+
+        // Hide circle-specific legend settings for gradient legend types
+        this.legendItemStrokeColor.visible = !isGradientLegendType;
+        this.legendItemStrokeWidth.visible = !isGradientLegendType;
+        this.leaderLineColor.visible = !isGradientLegendType;
+        this.labelSpacing.visible = !isGradientLegendType;
+        this.roundOffLegendValues.visible = !isGradientLegendType;
+        this.hideMinIfBelowThreshold.visible = !isGradientLegendType;
+        this.minValueThreshold.visible = !isGradientLegendType;
+        this.minRadiusThreshold.visible = !isGradientLegendType;
+        this.xPadding.visible = !isGradientLegendType;
+        this.yPadding.visible = !isGradientLegendType;
+    }
 }
 
 /**
@@ -973,4 +1023,46 @@ export class CircleLabelSettingsGroup extends formattingSettings.SimpleCard {
         this.labelHaloColor,
         this.labelHaloWidth
     ];
+
+    /** Current chart type for conditional visibility */
+    private _chartType: string = "nested-circles";
+
+    /**
+     * Set the current chart type for conditional visibility.
+     * @param chartType - The selected chart type
+     */
+    public setChartType(chartType: string): void {
+        this._chartType = chartType;
+    }
+
+    /**
+     * Apply conditional visibility rules based on chart type.
+     * Label settings are hidden for H3 hexbin and hotspot chart types
+     * since these use aggregated data where individual labels don't apply.
+     */
+    public applyConditionalDisplayRules(): void {
+        const isAggregatedChartType = this._chartType === "h3-hexbin" || this._chartType === "hotspot";
+
+        // Hide all label settings for aggregated chart types
+        this.showLabels.visible = !isAggregatedChartType;
+        this.labelSource.visible = !isAggregatedChartType;
+        this.labelDisplayUnits.visible = !isAggregatedChartType;
+        this.labelDecimalPlaces.visible = !isAggregatedChartType;
+        this.labelFontSize.visible = !isAggregatedChartType;
+        this.labelFontColor.visible = !isAggregatedChartType;
+        this.labelFontFamily.visible = !isAggregatedChartType;
+        this.labelPosition.visible = !isAggregatedChartType;
+        this.labelOffset.visible = !isAggregatedChartType;
+        this.showLabelBackground.visible = !isAggregatedChartType;
+        this.labelBackgroundColor.visible = !isAggregatedChartType;
+        this.labelBackgroundOpacity.visible = !isAggregatedChartType;
+        this.labelBackgroundPadding.visible = !isAggregatedChartType;
+        this.labelBackgroundBorderRadius.visible = !isAggregatedChartType;
+        this.showLabelBorder.visible = !isAggregatedChartType;
+        this.labelBorderColor.visible = !isAggregatedChartType;
+        this.labelBorderWidth.visible = !isAggregatedChartType;
+        this.showLabelHalo.visible = !isAggregatedChartType;
+        this.labelHaloColor.visible = !isAggregatedChartType;
+        this.labelHaloWidth.visible = !isAggregatedChartType;
+    }
 }

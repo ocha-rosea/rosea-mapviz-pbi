@@ -9,7 +9,7 @@ Rendering engines
 
 - SVG (default): great quality for small–medium datasets.
 - Canvas: faster CPU rendering; good for large polygons/many points.
-- WebGL: GPU-accelerated circles and choropleth. Pie/Donut circles fall back to Canvas. If WebGL isn’t available, the visual auto-falls back to Canvas.
+
 
 ## Features
 
@@ -80,7 +80,7 @@ GeoBoundaries notes
 1) Add the visual to your report (import .pbiviz or use Developer Mode).
 2) Bind Boundary ID or Latitude/Longitude and your measures.
 3) In Format, toggle layers and choose basemap, color ramp, and legend.
-4) Optional: switch Rendering Engine (SVG, Canvas, WebGL).
+4) Optional: switch Rendering Engine (SVG or Canvas).
 
 ## Install & develop
 
@@ -91,12 +91,6 @@ GeoBoundaries notes
   - Dev server: npm start (Power BI Developer Mode)
   - Package: npm run build (outputs dist/*.pbiviz)
   - Tests: npm test (Jest)
-
-## WebGL specifics
-
-- Enable via Format → Map Tools → Rendering Engine → WebGL.
-- Circles and choropleth use GPU paths; pie/donut circles render via Canvas in WebGL mode.
-- Environments without WebGL are automatically downgraded to Canvas.
 
 ## Security & privileges
 

@@ -476,10 +476,9 @@ console.log(`Adaptive scaling: P95=${percentile95}, Max=${actualMax}, Gap ratio=
 
 ### Performance Improvements
 
-1. **WebGL Rendering**: Hardware-accelerated circle rendering for large datasets
-2. **Spatial Indexing**: Improved hit-testing and selection performance
-3. **Level-of-Detail**: Adaptive rendering quality based on zoom level
-4. **Caching Strategy**: Intelligent caching for repeat visualizations
+1. **Spatial Indexing**: Improved hit-testing and selection performance
+2. **Level-of-Detail**: Adaptive rendering quality based on zoom level
+3. **Caching Strategy**: Intelligent caching for repeat visualizations
 
 ---
 

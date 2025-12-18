@@ -842,11 +842,20 @@ export class CircleSvgLayer extends Layer {
                 .style('pointer-events', 'all');
 
             // Add tooltip showing aggregated value
+            // Note: H3 hexbins aggregate multiple points into cells, so individual row tooltips
+            // from the Tooltips data role cannot be shown. Instead, we display aggregated statistics.
             if (this.options.tooltipServiceWrapper) {
                 const aggregationLabel = h3AggregationType.charAt(0).toUpperCase() + h3AggregationType.slice(1);
+                const measureName = this.options.sizeMeasureName || 'Value';
+                
+                // Build descriptive tooltip label: "Sum of Fatalities" or just "Count"
+                const valueLabel = h3AggregationType === 'count' 
+                    ? 'Count' 
+                    : `${aggregationLabel} of ${measureName}`;
+                
                 const tooltipData: powerbi.extensibility.VisualTooltipDataItem[] = [
-                    { displayName: aggregationLabel, value: hexbin.value.toLocaleString() },
-                    { displayName: 'Point Count', value: hexbin.count.toString() }
+                    { displayName: valueLabel, value: hexbin.value.toLocaleString() },
+                    { displayName: 'Points in Cell', value: hexbin.count.toString() }
                 ];
                 
                 this.options.tooltipServiceWrapper.addTooltip(

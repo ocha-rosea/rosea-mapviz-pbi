@@ -3,7 +3,8 @@
 export const VisualObjectNames = {
     ProportionalCircles: "proportionalCirclesVisualCardSettings",
     Choropleth: "choroplethVisualCardSettings",
-    MapControls: "mapControlsVisualCardSettings",
+    MapTools: "mapToolsVisualCardSettings",
+    LegendContainer: "legendContainerVisualCardSettings",
 } as const;
 
 export const VisualObjectProps = {

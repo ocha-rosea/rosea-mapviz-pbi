@@ -60,27 +60,28 @@ export class OptionsService {
      * @returns Typed MapToolsOptions for visual configuration
      */
     static getMapToolsOptions(model: RoseaMapVizFormattingSettingsModel): MapToolsOptions {
-        const maptoolsSettings = model.mapControlsVisualCardSettings;
+        const maptoolsSettings = model.mapToolsVisualCardSettings;
+        const legendContainerSettings = model.legendContainerVisualCardSettings;
         return {
-            renderEngine: maptoolsSettings.mapToolsSettingsGroup.renderEngine.value.value as any,
-            lockMapExtent: maptoolsSettings.mapToolsSettingsGroup.lockMapExtent.value,
-            showZoomControl: maptoolsSettings.mapToolsSettingsGroup.showZoomControl.value,
-            lockedMapExtent: maptoolsSettings.mapToolsSettingsGroup.lockedMapExtent.value,
-            lockedMapZoom: maptoolsSettings.mapToolsSettingsGroup.lockedMapZoom.value,
-            mapFitPaddingTop: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingTop.value ?? 0,
-            mapFitPaddingRight: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingRight.value ?? 30,
-            mapFitPaddingBottom: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingBottom.value ?? 0,
-            mapFitPaddingLeft: maptoolsSettings.mapToolsSettingsGroup.mapFitPaddingLeft.value ?? 30,
-            legendPosition: maptoolsSettings.legendContainerSettingsGroup.legendPosition.value.value.toString(),
-            legendBorderWidth: maptoolsSettings.legendContainerSettingsGroup.legendBorderWidth.value,
-            legendBorderColor: maptoolsSettings.legendContainerSettingsGroup.legendBorderColor.value.value,
-            legendBackgroundColor: maptoolsSettings.legendContainerSettingsGroup.legendBackgroundColor.value.value,
-            legendBackgroundOpacity: maptoolsSettings.legendContainerSettingsGroup.legendBackgroundOpacity.value / 100,
-            legendBorderRadius: maptoolsSettings.legendContainerSettingsGroup.legendBorderRadius.value,
-            legendBottomMargin: maptoolsSettings.legendContainerSettingsGroup.legendBottomMargin.value,
-            legendTopMargin: maptoolsSettings.legendContainerSettingsGroup.legendTopMargin.value,
-            legendLeftMargin: maptoolsSettings.legendContainerSettingsGroup.legendLeftMargin.value,
-            legendRightMargin: maptoolsSettings.legendContainerSettingsGroup.legendRightMargin.value
+            renderEngine: maptoolsSettings.renderEngine.value.value as any,
+            lockMapExtent: maptoolsSettings.lockMapExtent.value,
+            showZoomControl: maptoolsSettings.showZoomControl.value,
+            lockedMapExtent: maptoolsSettings.lockedMapExtent.value,
+            lockedMapZoom: maptoolsSettings.lockedMapZoom.value,
+            mapFitPaddingTop: maptoolsSettings.mapFitPaddingTop.value ?? 20,
+            mapFitPaddingRight: maptoolsSettings.mapFitPaddingRight.value ?? 30,
+            mapFitPaddingBottom: maptoolsSettings.mapFitPaddingBottom.value ?? 20,
+            mapFitPaddingLeft: maptoolsSettings.mapFitPaddingLeft.value ?? 30,
+            legendPosition: legendContainerSettings.legendPosition.value.value.toString(),
+            legendBorderWidth: legendContainerSettings.legendBorderWidth.value,
+            legendBorderColor: legendContainerSettings.legendBorderColor.value.value,
+            legendBackgroundColor: legendContainerSettings.legendBackgroundColor.value.value,
+            legendBackgroundOpacity: legendContainerSettings.legendBackgroundOpacity.value / 100,
+            legendBorderRadius: legendContainerSettings.legendBorderRadius.value,
+            legendBottomMargin: legendContainerSettings.legendBottomMargin.value,
+            legendTopMargin: legendContainerSettings.legendTopMargin.value,
+            legendLeftMargin: legendContainerSettings.legendLeftMargin.value,
+            legendRightMargin: legendContainerSettings.legendRightMargin.value
         };
     }
 
@@ -128,7 +129,9 @@ export class OptionsService {
             h3Resolution: circleSettings.proportionalCirclesDisplaySettingsGroup.h3Resolution.value,
             h3AggregationType: circleSettings.proportionalCirclesDisplaySettingsGroup.h3AggregationType.value.value.toString(),
             h3ColorRamp: circleSettings.proportionalCirclesDisplaySettingsGroup.h3ColorRamp.value.value.toString(),
-            h3FillColor: circleSettings.proportionalCirclesDisplaySettingsGroup.h3FillColor.value?.value || '#3182bd',
+            h3FillColor: circleSettings.proportionalCirclesDisplaySettingsGroup.h3FillColor.value?.value || '#ffffcc',
+            h3FillColorMiddle: circleSettings.proportionalCirclesDisplaySettingsGroup.h3FillColorMiddle.value?.value || '#fd8d3c',
+            h3FillColorEnd: circleSettings.proportionalCirclesDisplaySettingsGroup.h3FillColorEnd.value?.value || '#800026',
             h3StrokeColor: circleSettings.proportionalCirclesDisplaySettingsGroup.h3StrokeColor.value?.value || '#ffffff',
             h3StrokeWidth: circleSettings.proportionalCirclesDisplaySettingsGroup.h3StrokeWidth.value,
             h3MinOpacity: circleSettings.proportionalCirclesDisplaySettingsGroup.h3MinOpacity.value,

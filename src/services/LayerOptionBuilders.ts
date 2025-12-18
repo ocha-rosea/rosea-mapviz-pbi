@@ -57,6 +57,7 @@ export class CircleLayerOptionsBuilder {
         dataPoints: any[];
         circle1SizeValues?: number[];
         circle2SizeValues?: number[];
+        sizeMeasureName?: string;
         labelValues?: string[];
         labelOptions?: CircleLabelOptions;
     }): CircleLayerOptions {
@@ -67,6 +68,7 @@ export class CircleLayerOptionsBuilder {
             combinedCircleSizeValues: params.combinedCircleSizeValues,
             circle1SizeValues: params.circle1SizeValues,
             circle2SizeValues: params.circle2SizeValues,
+            sizeMeasureName: params.sizeMeasureName,
             minCircleSizeValue: params.minCircleSizeValue,
             maxCircleSizeValue: params.maxCircleSizeValue,
             circleScale: params.circleScale,

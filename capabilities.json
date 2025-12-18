@@ -398,6 +398,24 @@
             }
           }
         },
+        "h3FillColorMiddle": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "h3FillColorEnd": {
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
         "h3StrokeColor": {
           "type": {
             "fill": {
@@ -1020,7 +1038,7 @@
         }
       }
     },
-    "mapControlsVisualCardSettings": {
+    "mapToolsVisualCardSettings": {
       "properties": {
         "renderEngine": {
           "type": {
@@ -1042,6 +1060,35 @@
             "text": true
           }
         },
+        "lockedMapZoom": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingTop": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingRight": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingBottom": {
+          "type": {
+            "numeric": true
+          }
+        },
+        "mapFitPaddingLeft": {
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "legendContainerVisualCardSettings": {
+      "properties": {
         "legendPosition": {
           "type": {
             "enumeration": []
@@ -1096,31 +1143,6 @@
           }
         },
         "legendRightMargin": {
-          "type": {
-            "numeric": true
-          }
-        },
-        "lockedMapZoom": {
-          "type": {
-            "numeric": true
-          }
-        },
-        "mapFitPaddingTop": {
-          "type": {
-            "numeric": true
-          }
-        },
-        "mapFitPaddingRight": {
-          "type": {
-            "numeric": true
-          }
-        },
-        "mapFitPaddingBottom": {
-          "type": {
-            "numeric": true
-          }
-        },
-        "mapFitPaddingLeft": {
           "type": {
             "numeric": true
           }

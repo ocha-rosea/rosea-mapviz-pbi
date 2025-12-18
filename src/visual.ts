@@ -55,7 +55,6 @@ import { ChoroplethOrchestrator } from "./orchestration/ChoroplethOrchestrator";
 import { CircleOrchestrator } from "./orchestration/CircleOrchestrator";
 import { DomIds } from "./constants/strings";
 import { RoleNames } from "./constants/roles";
-import { isWebGLAvailable } from "./utils/render";
 
 export class RoseaMapViz implements IVisual {
     private host: IVisualHost;
@@ -226,11 +225,8 @@ export class RoseaMapViz implements IVisual {
             this.visualFormattingSettingsModel = this.formattingSettingsService
                 .populateFormattingSettingsModel(RoseaMapVizFormattingSettingsModel, options.dataViews[0]);
 
-            // Get latest options early for lockMapExtent + engine fallback
+            // Get latest options early for lockMapExtent
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
-            if (this.mapToolsOptions.renderEngine === 'webgl' && !isWebGLAvailable()) {
-                this.mapToolsOptions = { ...this.mapToolsOptions, renderEngine: 'canvas' } as any;
-            }
 
             const categorical = dataView?.categorical;
             const mapboxCredential = categorical
@@ -273,8 +269,8 @@ export class RoseaMapViz implements IVisual {
             }
             classificationGroup.applyConditionalDisplayRules();
             
-            this.visualFormattingSettingsModel.mapControlsVisualCardSettings.mapToolsSettingsGroup.applyConditionalDisplayRules();
-            this.visualFormattingSettingsModel.mapControlsVisualCardSettings.legendContainerSettingsGroup.applyConditionalDisplayRules();
+            this.visualFormattingSettingsModel.mapToolsVisualCardSettings.applyConditionalDisplayRules();
+            this.visualFormattingSettingsModel.legendContainerVisualCardSettings.applyConditionalDisplayRules();
 
             // Detect if Circle 2 data is present for conditional settings visibility
             const circleSizeValues = categorical?.values?.filter(c => c.source?.roles?.[RoleNames.Size]) || [];
@@ -282,6 +278,18 @@ export class RoseaMapViz implements IVisual {
             const circleDisplayGroup = this.visualFormattingSettingsModel.ProportionalCirclesVisualCardSettings.proportionalCirclesDisplaySettingsGroup;
             circleDisplayGroup.setCircle2DataAvailable(hasCircle2Data);
             circleDisplayGroup.applyConditionalDisplayRules();
+
+            // Apply conditional visibility to legend settings based on chart type
+            const circleLegendGroup = this.visualFormattingSettingsModel.ProportionalCirclesVisualCardSettings.proportionalCirclesLegendSettingsGroup;
+            const currentChartType = String(circleDisplayGroup.chartType.value?.value || "nested-circle");
+            circleLegendGroup.setChartType(currentChartType);
+            circleLegendGroup.applyConditionalDisplayRules();
+
+            // Apply conditional visibility to label settings based on chart type
+            // Labels are hidden for H3 hexbin and hotspot as they use aggregated data
+            const circleLabelGroup = this.visualFormattingSettingsModel.ProportionalCirclesVisualCardSettings.circleLabelSettingsGroup;
+            circleLabelGroup.setChartType(currentChartType);
+            circleLabelGroup.applyConditionalDisplayRules();
 
             const basemapSettingGroups = this.visualFormattingSettingsModel.BasemapVisualCardSettings;
             basemapSettingGroups.mapBoxSettingsGroup.mapboxAccessToken.visible = !mapboxCredential;
@@ -302,9 +310,6 @@ export class RoseaMapViz implements IVisual {
                 mapboxAccessToken: mapboxCredential,
             });
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
-            if (this.mapToolsOptions.renderEngine === 'webgl' && !isWebGLAvailable()) {
-                this.mapToolsOptions = { ...this.mapToolsOptions, renderEngine: 'canvas' } as any;
-            }
 
             // User-driven layer toggles (no auto state)
             circleOptions.layerControl = circleOptions.layerControl;

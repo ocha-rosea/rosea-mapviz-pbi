@@ -1,3 +1,381 @@
+# ROSEA MapViz - H3/Hotspot Enhancements & Map Controls Update
+
+## Overview
+
+This implementation plan covers six main feature areas:
+1. ✅ H3 Resolution finer increments for hexbins
+2. ✅ Map fit padding defaults (top/bottom to 20)
+3. ✅ Lock map extent behavior improvements
+4. ✅ Gradient legends for H3 hexbin and hotspot display types
+5. ✅ Circle legend settings visibility based on chart type
+6. ✅ **Refactor: Split Controls card into Map Tools and Legend Container cards**
+
+---
+
+## Task 0: Refactor Controls Card Structure ✅ COMPLETED
+
+### Current State
+- Single `MapControlsVisualCardSettings` ("Controls") card contains two groups:
+  - `MapToolsSettingsGroup` - render engine, zoom, lock extent, fit padding
+  - `LegendContainerSettingsGroup` - legend position, borders, margins
+
+### Target State
+- ✅ **Removed** `MapControlsVisualCardSettings` composite card
+- ✅ **Created** `MapToolsVisualCardSettings` as standalone card with `MapToolsSettingsGroup`
+- ✅ **Created** `LegendContainerVisualCardSettings` as standalone card with `LegendContainerSettingsGroup`
+- Each becomes a top-level card in the formatting pane
+
+### Files modified:
+- ✅ `src/settings/cards/ControlsCard.ts` → Split into `MapToolsCard.ts` and `LegendContainerCard.ts`
+- ✅ `src/settings/cards/index.ts` - Updated exports
+- ✅ `src/settings/FormattingSettingsModel.ts` - Replaced with two new cards
+- ✅ `src/visual.ts` - Updated references
+- ✅ `src/services/OptionsService.ts` - Updated references
+- ✅ `src/constants/strings.ts` - Updated card name constants
+- ✅ `capabilities.json` - Split into two separate card configurations
+- ✅ `tests/**` - Updated test references
+
+### New Structure:
+```
+Formatting Pane:
+├── Map Tools          ← NEW standalone card
+│   ├── Render Engine
+│   ├── Lock Map Extent
+│   ├── Show Zoom Control
+│   └── Fit Padding (Top/Right/Bottom/Left)
+├── Legend Container   ← NEW standalone card
+│   ├── Position
+│   ├── Border (Width/Radius/Color)
+│   ├── Background (Color/Opacity)
+│   └── Margins (Top/Bottom/Left/Right)
+├── Basemap
+├── Scaled Circles
+└── Choropleth
+```
+
+**Status:** ✅ COMPLETED
+
+---
+
+## Task 1: H3 Resolution Finer Increments ✅ COMPLETED
+
+### Implementation
+Updated description to show approximate hexagon sizes:
+- Description: "H3 hexbin resolution level (0-15). Approx sizes: 0=1100km, 3=60km, 5=8km, 7=1.2km, 9=175m, 12=9m"
+
+**Files modified:**
+- ✅ `src/settings/groups/CircleGroups.ts`: Updated h3Resolution description
+
+**Status:** ✅ COMPLETED
+
+---
+
+## Task 2: Map Fit Padding Defaults ✅ COMPLETED
+
+### Current State
+- `mapFitPaddingTop`: 0
+- `mapFitPaddingRight`: 30
+- `mapFitPaddingBottom`: 0
+- `mapFitPaddingLeft`: 30
+
+### Target State
+- `mapFitPaddingTop`: **20**
+- `mapFitPaddingRight`: 30
+- `mapFitPaddingBottom`: **20**
+- `mapFitPaddingLeft`: 30
+
+### Files to modify:
+- `src/settings/groups/ControlsGroups.ts`: Update default values for `mapFitPaddingTop` and `mapFitPaddingBottom`
+
+**Status:** ⬜ Not Started
+
+---
+
+## Task 3: Lock Map Extent Behavior Improvements
+
+### Current Issues
+1. When `lockMapExtent` is ON, `showZoomControl` toggle is hidden AND set to false
+2. User cannot enable zoom control in lock mode to adjust zoom level
+3. Panning behavior in lock mode needs verification
+
+### Implementation ✅ COMPLETED
+
+- ✅ Changed `mapFitPaddingTop` default from 0 to 20
+- ✅ Changed `mapFitPaddingBottom` default from 0 to 20
+- ✅ Updated fallback values in OptionsService
+
+**Status:** ✅ COMPLETED
+
+---
+
+## Task 3: Lock Map Extent Behavior ✅ COMPLETED
+
+### Implementation
+
+- ✅ Removed visibility toggle for `showZoomControl` when `lockMapExtent` is true
+- ✅ Zoom control toggle now remains visible regardless of lock state
+- ✅ User can choose whether to show zoom controls on a locked map
+
+**Files modified:**
+- ✅ `src/settings/groups/ControlsGroups.ts`: Removed hiding of `showZoomControl` when locked
+- ✅ `tests/unit/settings/mapToolsVisibility.test.ts`: Updated test expectations
+
+**Status:** ✅ COMPLETED
+
+---
+
+## Task 4: Gradient Legends for H3 Hexbin and Hotspot ✅ COMPLETED
+
+### Implementation
+
+- ✅ Created `createGradientLegend()` method in LegendService
+- ✅ Shows continuous color gradient bar with "Low" and "High" labels
+- ✅ Added three custom color stops for custom gradient:
+  - `h3FillColor` (Start/Low)
+  - `h3FillColorMiddle` (Middle)
+  - `h3FillColorEnd` (End/High)
+- ✅ Updated CircleOrchestrator to use gradient legend for H3/hotspot chart types
+- ✅ Added `getColorRampColors()` helper for predefined color ramps
+- ✅ Gradient legend uses circle legend container system
+
+**Files modified:**
+- ✅ `src/settings/groups/CircleGroups.ts`: Added h3FillColorMiddle, h3FillColorEnd settings
+- ✅ `src/services/LegendService.ts`: Added `createGradientLegend()` method
+- ✅ `src/types/index.ts`: Added new properties to CircleOptions
+- ✅ `src/services/OptionsService.ts`: Extract new settings
+- ✅ `src/orchestration/CircleOrchestrator.ts`: Added renderGradientLegend() and getColorRampColors()
+- ✅ `capabilities.json`: Registered h3FillColorMiddle, h3FillColorEnd properties
+
+**Status:** ✅ COMPLETED
+
+---
+
+## Task 5: Circle Legend Settings Visibility Based on Chart Type ✅ COMPLETED
+
+### Implementation
+
+- ✅ Added `setChartType()` method to `ProportionalCirclesLegendSettingsGroup`
+- ✅ Added `applyConditionalDisplayRules()` method
+- ✅ Hide circle-specific settings for H3/hotspot chart types:
+  - `legendItemStrokeColor`, `legendItemStrokeWidth`
+  - `leaderLineColor`
+  - `labelSpacing`
+  - `roundOffLegendValues`, `hideMinIfBelowThreshold`, `minValueThreshold`, `minRadiusThreshold`
+  - `xPadding`, `yPadding`
+- ✅ Keep visible for all types:
+  - `showLegend` - master toggle
+  - `legendTitleColor` - applies to all
+  - `labelTextColor` - applies to all
+
+**Files modified:**
+- ✅ `src/settings/groups/CircleGroups.ts`: Added methods to legend group
+- ✅ `src/visual.ts`: Called the new applyConditionalDisplayRules on legend group
+
+**Status:** ✅ COMPLETED
+
+---
+
+## All Tasks Completed ✅
+
+## Implementation Order (Completed)
+
+1. ✅ **Task 0** (Refactor Controls) - Structural change
+2. ✅ **Task 2** (Map Fit Padding) - Default value change
+3. ✅ **Task 1** (H3 Resolution) - Description improvement
+4. ✅ **Task 3** (Lock Map Extent) - Behavior fix
+5. ✅ **Task 5** (Legend Settings Visibility) - UI improvement
+6. ✅ **Task 4** (Gradient Legends) - New feature
+4. **Task 3** (Lock Map Extent) - Behavior changes, needs testing
+5. **Task 5** (Legend Settings Visibility) - UI improvement
+6. **Task 4** (Gradient Legends) - New feature, most complex
+
+---
+
+## Detailed Implementation Steps
+
+### Phase 0: Refactor Controls Card (Task 0)
+
+#### Step 0.1: Create MapToolsCard.ts
+```typescript
+// src/settings/cards/MapToolsCard.ts
+export class MapToolsVisualCardSettings extends formattingSettings.CompositeCard {
+    public mapToolsSettingsGroup = new MapToolsSettingsGroup();
+    name: string = "mapToolsVisualCardSettings";
+    displayName: string = "Map Tools";
+    groups: formattingSettings.Group[] = [this.mapToolsSettingsGroup];
+}
+```
+
+#### Step 0.2: Create LegendContainerCard.ts
+```typescript
+// src/settings/cards/LegendContainerCard.ts
+export class LegendContainerVisualCardSettings extends formattingSettings.CompositeCard {
+    public legendContainerSettingsGroup = new LegendContainerSettingsGroup();
+    name: string = "legendContainerVisualCardSettings";
+    displayName: string = "Legend Container";
+    groups: formattingSettings.Group[] = [this.legendContainerSettingsGroup];
+}
+```
+
+#### Step 0.3: Update FormattingSettingsModel.ts
+Replace `mapControlsVisualCardSettings` with:
+- `mapToolsVisualCardSettings`
+- `legendContainerVisualCardSettings`
+
+#### Step 0.4: Update capabilities.json
+Split properties into two separate objects.
+
+---
+
+### Phase 1: Quick Wins (Tasks 1 & 2)
+
+#### Step 1.1: Update Map Fit Padding Defaults
+```typescript
+// src/settings/groups/ControlsGroups.ts (now MapToolsSettingsGroup)
+mapFitPaddingTop: value: 20  // was 0
+mapFitPaddingBottom: value: 20  // was 0
+```
+
+#### Step 1.2: Update H3 Resolution Description
+```typescript
+// src/settings/groups/CircleGroups.ts
+h3Resolution: formattingSettings.Slider({
+    description: "H3 resolution (0-15). Higher = smaller hexbins. Res 4 ≈ 23km, Res 7 ≈ 1.2km, Res 10 ≈ 66m"
+})
+```
+
+### Phase 2: Lock Map Extent Improvements (Task 3)
+
+#### Step 2.1: Keep Zoom Control Visible
+```typescript
+// src/settings/groups/ControlsGroups.ts
+public applyConditionalDisplayRules(): void {
+    this.lockedMapExtent.visible = false;
+    this.lockedMapZoom.visible = false;
+    // REMOVED: No longer hide showZoomControl when locked
+    // User can toggle zoom control even in lock mode
+}
+```
+
+#### Step 2.2: Verify/Fix Panning in Lock Mode
+- Review `MapService.lockExtent()` to ensure it doesn't disable panning
+- Update extent storage when user pans/zooms in lock mode
+
+### Phase 3: Legend Settings Visibility (Task 5)
+
+#### Step 3.1: Add chartType tracking to Legend Group
+```typescript
+// src/settings/groups/CircleGroups.ts
+export class ProportionalCirclesLegendSettingsGroup extends formattingSettings.SimpleCard {
+    private _chartType: string = 'nested-circle';
+    
+    public setChartType(chartType: string): void {
+        this._chartType = chartType;
+    }
+    
+    public applyConditionalDisplayRules(): void {
+        const isGradientLegend = this._chartType === 'h3-hexbin' || this._chartType === 'hotspot';
+        
+        // Hide circle-specific settings for gradient legends
+        this.legendItemStrokeColor.visible = !isGradientLegend;
+        this.legendItemStrokeWidth.visible = !isGradientLegend;
+        this.leaderLineColor.visible = !isGradientLegend;
+        this.roundOffLegendValues.visible = !isGradientLegend;
+        this.hideMinIfBelowThreshold.visible = !isGradientLegend;
+        this.minValueThreshold.visible = !isGradientLegend;
+        this.minRadiusThreshold.visible = !isGradientLegend;
+    }
+}
+```
+
+#### Step 3.2: Call from visual.ts
+```typescript
+// After circleDisplayGroup.applyConditionalDisplayRules()
+const chartType = circleDisplayGroup.chartType.value?.value || 'nested-circle';
+const circleLegendGroup = this.visualFormattingSettingsModel.ProportionalCirclesVisualCardSettings.proportionalCirclesLegendSettingsGroup;
+circleLegendGroup.setChartType(chartType);
+circleLegendGroup.applyConditionalDisplayRules();
+```
+
+### Phase 4: Gradient Legends (Task 4)
+
+#### Step 3.1: Add New Settings
+- H3 legend toggle, title, and 3 custom colors
+- Hotspot legend toggle, title, and middle color
+
+#### Step 3.2: Create Gradient Legend Method
+```typescript
+// src/services/LegendService.ts
+createGradientLegend(
+    title: string,
+    colors: string[],  // Array of 2+ colors for gradient
+    options: {
+        lowLabel?: string,
+        highLabel?: string,
+        titleColor?: string,
+        labelColor?: string,
+        orientation?: 'horizontal' | 'vertical'
+    }
+)
+```
+
+#### Step 3.3: Integrate with CircleOrchestrator
+- Call `createGradientLegend()` when chartType is 'h3-hexbin' or 'hotspot'
+- Pass appropriate colors based on color ramp or custom colors
+
+---
+
+## Testing Checklist
+
+- [ ] **Task 0**: Map Tools and Legend Container appear as separate cards in formatting pane
+- [ ] **Task 0**: All settings work correctly after refactor
+- [ ] **Task 0**: No broken references in code
+- [ ] H3 resolution description shows size context
+- [ ] Map fit padding defaults to 20 for top/bottom
+- [ ] Zoom control toggle remains visible when map is locked
+- [ ] Zoom changes are captured when in lock mode
+- [ ] Panning works in lock mode and updates stored extent
+- [ ] Circle legend settings hidden when H3/hotspot selected
+- [ ] H3 hexbin shows gradient legend when enabled
+- [ ] Hotspot shows gradient legend when enabled
+- [ ] Custom colors (start/middle/end) create proper gradient
+- [ ] Gradient legend shows Low/High labels
+- [ ] All rendering engines (SVG, Canvas, WebGL) work correctly
+
+---
+
+## Risk Assessment
+
+| Task | Risk Level | Notes |
+|------|------------|-------|
+| Task 0 | Medium | Structural refactor, affects many files but straightforward |
+| Task 1 | Low | Documentation only, no logic change |
+| Task 2 | Low | Simple default value change |
+| Task 3 | Medium | Behavior change, needs careful testing |
+| Task 5 | Low | UI visibility only, no logic change |
+| Task 4 | Medium | New feature, multiple file changes |
+
+---
+
+## Estimated Effort
+
+| Task | Estimated Time |
+|------|----------------|
+| Task 0 | 1-2 hours |
+| Task 1 | 15 minutes |
+| Task 2 | 10 minutes |
+| Task 3 | 1-2 hours |
+| Task 5 | 30 minutes |
+| Task 4 | 3-4 hours |
+| **Total** | **~7-9 hours** |
+
+---
+---
+
+# ARCHIVED: Previous Implementation Plans
+
+---
+
 # ROSEA MapViz - Feature Color Property Support
 
 ## Overview
