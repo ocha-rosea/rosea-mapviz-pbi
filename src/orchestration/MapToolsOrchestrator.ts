@@ -39,6 +39,10 @@ export class MapToolsOrchestrator {
   private isTracking: boolean = false;
   /** Bound handler for moveend event */
   private moveEndHandler: (() => void) | null = null;
+  /** Handler for persisting extent changes in locked mode */
+  private lockedMoveEndHandler: (() => void) | null = null;
+  /** Persist callback for locked mode */
+  private persistCallback: ((extent: string, zoom: number) => void) | null = null;
 
   /**
    * Creates a new MapToolsOrchestrator.
@@ -174,21 +178,48 @@ export class MapToolsOrchestrator {
           this.map.getView().setZoom(zoom);
         }
       }
-      // Disable all map interactions when locked
-      this.mapService.disableInteractions();
+      // Disable zoom interactions only (keep dragPan enabled so user can update extent)
+      this.mapService.disableZoomInteractions();
+      
+      // Set up handler to persist extent changes when user drags in locked mode
+      this.persistCallback = persist;
+      if (!this.lockedMoveEndHandler) {
+        this.lockedMoveEndHandler = () => {
+          if (this.persistCallback) {
+            const view = this.map.getView();
+            const size = this.map.getSize();
+            if (view && size) {
+              const extent = view.calculateExtent(size);
+              const extentString = extent.join(",");
+              const zoom = view.getZoom() ?? 0;
+              this.persistCallback(extentString, zoom);
+            }
+          }
+        };
+        this.map.on("moveend", this.lockedMoveEndHandler);
+      }
     } else {
-      // Enable map interactions when not locked
-      this.mapService.enableInteractions();
+      // Enable zoom interactions when not locked
+      this.mapService.enableZoomInteractions();
+      
+      // Remove locked mode handler
+      if (this.lockedMoveEndHandler) {
+        this.map.un("moveend", this.lockedMoveEndHandler);
+        this.lockedMoveEndHandler = null;
+      }
+      this.persistCallback = null;
     }
   }
 
   /**
    * Detaches map tools functionality and cleans up event handlers.
-   * 
-   * @deprecated No longer needed as we don't attach event handlers anymore.
-   * Kept for API compatibility.
    */
   public detach(): void {
-    // No-op - we no longer use event handlers for extent locking
+    // Clean up locked mode handler
+    if (this.lockedMoveEndHandler) {
+      this.map.un("moveend", this.lockedMoveEndHandler);
+      this.lockedMoveEndHandler = null;
+    }
+    this.persistCallback = null;
   }
 }

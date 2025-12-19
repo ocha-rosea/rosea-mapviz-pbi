@@ -44,9 +44,12 @@ class MockMap {
 class MockMapService {
   zoomVisible: boolean | undefined;
   interactionsEnabled: boolean = true;
+  zoomInteractionsEnabled: boolean = true;
   setZoomControlVisible(v: boolean){ this.zoomVisible = v; }
   disableInteractions() { this.interactionsEnabled = false; }
   enableInteractions() { this.interactionsEnabled = true; }
+  disableZoomInteractions() { this.zoomInteractionsEnabled = false; }
+  enableZoomInteractions() { this.zoomInteractionsEnabled = true; }
 }
 
 describe('MapToolsOrchestrator', () => {

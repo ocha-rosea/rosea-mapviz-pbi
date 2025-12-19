@@ -16,7 +16,7 @@ import VectorTileSource from "ol/source/VectorTile";
 import VectorTileLayer from "ol/layer/VectorTile";
 import Zoom from "ol/control/Zoom";
 import { ZoomControlManager } from "./ZoomControlManager";
-import { defaults as defaultInteractions, Interaction } from 'ol/interaction';
+import { defaults as defaultInteractions, Interaction, MouseWheelZoom, DoubleClickZoom, PinchZoom, DragZoom, KeyboardZoom } from 'ol/interaction';
 
 
 /**
@@ -301,8 +301,46 @@ export class MapService {
     }
 
     /**
+     * Disables zoom-related map interactions only (scroll, pinch, double-click, keyboard zoom).
+     * DragPan remains enabled so users can pan to update the extent while locked.
+     * Used when Lock Map Extent is enabled.
+     */
+    public disableZoomInteractions(): void {
+        this.map.getInteractions().forEach((interaction: Interaction) => {
+            if (
+                interaction instanceof MouseWheelZoom ||
+                interaction instanceof DoubleClickZoom ||
+                interaction instanceof PinchZoom ||
+                interaction instanceof DragZoom ||
+                interaction instanceof KeyboardZoom
+            ) {
+                interaction.setActive(false);
+            }
+        });
+    }
+
+    /**
+     * Enables all zoom-related map interactions.
+     * Used when Lock Map Extent is disabled to restore normal zoom behavior.
+     */
+    public enableZoomInteractions(): void {
+        this.map.getInteractions().forEach((interaction: Interaction) => {
+            if (
+                interaction instanceof MouseWheelZoom ||
+                interaction instanceof DoubleClickZoom ||
+                interaction instanceof PinchZoom ||
+                interaction instanceof DragZoom ||
+                interaction instanceof KeyboardZoom
+            ) {
+                interaction.setActive(true);
+            }
+        });
+    }
+
+    /**
      * Disables all map interactions (zoom, pan, etc.).
      * Used when Lock Map Extent is enabled to prevent any map navigation.
+     * @deprecated Use disableZoomInteractions() instead to allow panning
      */
     public disableInteractions(): void {
         this.map.getInteractions().forEach((interaction: Interaction) => {
@@ -313,6 +351,7 @@ export class MapService {
     /**
      * Enables all map interactions (zoom, pan, etc.).
      * Used when Lock Map Extent is disabled to restore normal map navigation.
+     * @deprecated Use enableZoomInteractions() instead
      */
     public enableInteractions(): void {
         this.map.getInteractions().forEach((interaction: Interaction) => {
