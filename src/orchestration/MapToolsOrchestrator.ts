@@ -174,11 +174,12 @@ export class MapToolsOrchestrator {
           this.map.getView().setZoom(zoom);
         }
       }
-      // NOTE: No postrender handler - we don't persist pan/zoom changes while locked
-      // Users can explore temporarily, but the locked position remains unchanged
+      // Disable all map interactions when locked
+      this.mapService.disableInteractions();
+    } else {
+      // Enable map interactions when not locked
+      this.mapService.enableInteractions();
     }
-    // NOTE: When lock is disabled, we don't need to do anything special
-    // The normal fit-to-data behavior will take over
   }
 
   /**

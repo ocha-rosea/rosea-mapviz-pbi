@@ -16,7 +16,7 @@ import VectorTileSource from "ol/source/VectorTile";
 import VectorTileLayer from "ol/layer/VectorTile";
 import Zoom from "ol/control/Zoom";
 import { ZoomControlManager } from "./ZoomControlManager";
-import { defaults as defaultInteractions } from 'ol/interaction';
+import { defaults as defaultInteractions, Interaction } from 'ol/interaction';
 
 
 /**
@@ -300,5 +300,23 @@ export class MapService {
         }
     }
 
-   
+    /**
+     * Disables all map interactions (zoom, pan, etc.).
+     * Used when Lock Map Extent is enabled to prevent any map navigation.
+     */
+    public disableInteractions(): void {
+        this.map.getInteractions().forEach((interaction: Interaction) => {
+            interaction.setActive(false);
+        });
+    }
+
+    /**
+     * Enables all map interactions (zoom, pan, etc.).
+     * Used when Lock Map Extent is disabled to restore normal map navigation.
+     */
+    public enableInteractions(): void {
+        this.map.getInteractions().forEach((interaction: Interaction) => {
+            interaction.setActive(true);
+        });
+    }
 }
