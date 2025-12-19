@@ -51,6 +51,8 @@ export interface ChoroplethVectorTileLayerOptions {
     isHighContrast?: boolean;
     /** High contrast colors from Power BI */
     highContrastColors?: HighContrastColors;
+    /** Whether map extent is locked (skip fit operations) */
+    lockMapExtent?: boolean;
 }
 const NO_DATA_COLOR = "rgba(0,0,0,0)";
 
@@ -220,7 +222,10 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
     public attachToMap(map: OLMap): void {
         this.attachedMap = map;
         this.setupInteractions();
-        this.setupFitToExtent(map);
+        // Only fit to extent if map is not locked
+        if (!this.options.lockMapExtent) {
+            this.setupFitToExtent(map);
+        }
     }
 
     /**

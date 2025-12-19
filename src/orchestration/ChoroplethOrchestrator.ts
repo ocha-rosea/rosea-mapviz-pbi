@@ -648,6 +648,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             fillOpacity: choroplethOptions.layerOpacity,
             host: this.host,
             selectionManager: this.selectionManager,
+            lockMapExtent: mapToolsOptions.lockMapExtent,
         });
 
         this.choroplethLayer = vtLayer;
