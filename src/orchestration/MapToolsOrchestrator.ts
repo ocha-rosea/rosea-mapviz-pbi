@@ -9,7 +9,8 @@ import { MapToolsOptions } from "../types/index";
  * functionality that allows users to persist their map view across data refreshes.
  * 
  * **Lock Map Extent Behavior:**
- * - **Authoring (Desktop)**: Position the map, enable lock → current position is captured ONCE
+ * - **Continuous Tracking**: Map position is tracked on every moveend event
+ * - **Authoring (Desktop)**: When user enables lock, the tracked position is persisted
  * - **Reading (Published)**: Map always restores to locked position on page load
  * - **Temporary navigation**: Users can zoom/pan to explore, but changes are NOT persisted
  * - **Page navigation**: Returning to the page restores the locked position
@@ -17,8 +18,9 @@ import { MapToolsOptions } from "../types/index";
  * @example
  * ```typescript
  * const orchestrator = new MapToolsOrchestrator(map, mapService);
+ * orchestrator.startTrackingPosition(); // Call once after map is ready
  * orchestrator.attach(options, (extent, zoom) => {
- *   // Persist extent and zoom to Power BI properties (only called once when first locking)
+ *   // Persist extent and zoom to Power BI properties
  * });
  * ```
  */
@@ -29,6 +31,14 @@ export class MapToolsOrchestrator {
   private mapService: MapService;
   /** Current map tools configuration */
   private mapToolsOptions: MapToolsOptions;
+  
+  /** Tracked map position - continuously updated on moveend */
+  private trackedExtent: string = "";
+  private trackedZoom: number = 0;
+  /** Whether position tracking is active */
+  private isTracking: boolean = false;
+  /** Bound handler for moveend event */
+  private moveEndHandler: (() => void) | null = null;
 
   /**
    * Creates a new MapToolsOrchestrator.
@@ -42,12 +52,57 @@ export class MapToolsOrchestrator {
   }
 
   /**
+   * Starts tracking the map position on every moveend event.
+   * This should be called once after the map is initialized.
+   * The tracked position is used when lock is first enabled.
+   */
+  public startTrackingPosition(): void {
+    if (this.isTracking) return;
+    
+    this.moveEndHandler = () => {
+      const view = this.map.getView();
+      const size = this.map.getSize();
+      if (view && size) {
+        const extent = view.calculateExtent(size);
+        this.trackedExtent = extent.join(",");
+        this.trackedZoom = view.getZoom() ?? 0;
+      }
+    };
+    
+    this.map.on("moveend", this.moveEndHandler);
+    this.isTracking = true;
+    
+    // Capture initial position
+    this.moveEndHandler();
+  }
+
+  /**
+   * Stops tracking the map position.
+   */
+  public stopTrackingPosition(): void {
+    if (!this.isTracking || !this.moveEndHandler) return;
+    
+    this.map.un("moveend", this.moveEndHandler);
+    this.moveEndHandler = null;
+    this.isTracking = false;
+  }
+
+  /**
+   * Gets the currently tracked map position.
+   * @returns The tracked extent and zoom, or null if not tracking
+   */
+  public getTrackedPosition(): { extent: string; zoom: number } | null {
+    if (!this.trackedExtent) return null;
+    return { extent: this.trackedExtent, zoom: this.trackedZoom };
+  }
+
+  /**
    * Attaches map tools functionality based on the provided options.
    * 
    * Configures zoom control visibility and sets up extent locking if enabled.
    * 
    * **Lock behavior:**
-   * - First time lock enabled: Captures current map position and persists it ONCE
+   * - First time lock enabled: Uses the tracked position (captured before lock was enabled)
    * - Subsequent renders: Restores to the persisted locked position
    * - Users can temporarily zoom/pan to explore, but changes are NOT persisted
    * - Navigating away and back restores the locked position
@@ -70,14 +125,30 @@ export class MapToolsOrchestrator {
         this.mapToolsOptions.lockedMapExtent.split(",").length === 4;
       
       if (!hasStoredExtent) {
-        // FIRST TIME LOCKING: Capture current position and persist it ONCE
-        // This happens when user enables lock in authoring mode
-        const currentExtent = this.map.getView().calculateExtent(this.map.getSize());
-        const currentExtentString = currentExtent.join(",");
-        const currentZoom = this.map.getView().getZoom();
-        
-        // Persist the current position - this is the only time we persist while locked
-        persist(currentExtentString, currentZoom);
+        // FIRST TIME LOCKING: Use the TRACKED position (captured before settings change)
+        // This is the position the user had set before enabling lock
+        const tracked = this.getTrackedPosition();
+        if (tracked && tracked.extent) {
+          // Persist the tracked position - this was captured before the update cycle
+          persist(tracked.extent, tracked.zoom);
+          
+          // Also restore to this position immediately (in case something changed it)
+          const extentParts = tracked.extent.split(",").map(Number) as [number, number, number, number];
+          if (extentParts.every(n => !isNaN(n))) {
+            const center: [number, number] = [
+              (extentParts[0] + extentParts[2]) / 2,
+              (extentParts[1] + extentParts[3]) / 2,
+            ];
+            this.map.getView().setCenter(center);
+            this.map.getView().setZoom(tracked.zoom);
+          }
+        } else {
+          // Fallback: capture current position if tracking wasn't started
+          const currentExtent = this.map.getView().calculateExtent(this.map.getSize());
+          const currentExtentString = currentExtent.join(",");
+          const currentZoom = this.map.getView().getZoom() ?? 0;
+          persist(currentExtentString, currentZoom);
+        }
       } else {
         // RESTORE TO LOCKED POSITION: Parse and apply the saved extent/zoom
         // This happens on page load, data refresh, or returning to the page

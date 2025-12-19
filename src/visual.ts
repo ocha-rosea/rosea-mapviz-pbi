@@ -135,6 +135,11 @@ export class RoseaMapViz implements IVisual {
         this.view = this.mapService.getView();
         this.mapToolsOrchestrator = new MapToolsOrchestrator(this.map, this.mapService);
         
+        // Start tracking map position for lock extent feature
+        // This continuously tracks the position so when user enables lock,
+        // we use the tracked position (not the current which may have changed during update)
+        this.mapToolsOrchestrator.startTrackingPosition();
+        
         // Get D3 selection from DOM manager's SVG
         this.svg = d3.select(elements.svgOverlay);
         
@@ -205,25 +210,15 @@ export class RoseaMapViz implements IVisual {
         
         try {
             const dataView = options.dataViews[0];
+            
+            // Always reset to default view at start of update cycle
+            // MapToolsOrchestrator will restore to locked position if needed at the end
+            this.map.setView(this.view);
 
-            // Update formatting settings early to check lockMapExtent before view reset
+            // Update formatting settings
             this.visualFormattingSettingsModel = this.formattingSettingsService
                 .populateFormattingSettingsModel(RoseaMapVizFormattingSettingsModel, options.dataViews[0]);
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
-
-            // Only reset to default view if:
-            // - Lock is disabled, OR
-            // - Lock is enabled AND we already have a stored extent (will restore from lock)
-            // Skip reset when lock is enabled but no stored extent (we're about to capture current position)
-            const hasStoredExtent = 
-                typeof this.mapToolsOptions.lockedMapExtent === "string" &&
-                this.mapToolsOptions.lockedMapExtent.trim() !== "" &&
-                this.mapToolsOptions.lockedMapExtent.split(",").length === 4;
-            
-            const shouldResetView = !this.mapToolsOptions.lockMapExtent || hasStoredExtent;
-            if (shouldResetView) {
-                this.map.setView(this.view); // default view
-            }
 
             // Detect high contrast mode
             const colorPalette = this.host.colorPalette as ISandboxExtendedColorPalette;
