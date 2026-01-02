@@ -25,6 +25,7 @@ import { MessageService } from "../services/MessageService";
 import { ChoroplethCanvasLayer } from "../layers/canvas/choroplethCanvasLayer";
 import { ChoroplethVectorTileLayer } from "../layers/vectortile/choroplethVectorTileLayer";
 import { UniqueClassificationService } from "../services/UniqueClassificationService";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 
 /**
  * Orchestrator for choropleth (filled polygon) visualizations.
@@ -201,7 +202,10 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 if (choroplethLegendContainer) {
                     choroplethLegendContainer.style.display = "flex";
                 }
-                const formatString = colorMeasure?.source?.format;
+                const formatStringProp = { objectName: "general", propertyName: "formatString" } as any;
+                const formatString = colorMeasure?.source
+                    ? (valueFormatter.getFormatString(colorMeasure.source as any, formatStringProp, true) ?? colorMeasure.source.format)
+                    : undefined;
                 // Override legend title with colorMeasure display name if available
                 const legendOptionsWithTitle = colorMeasure?.source?.displayName
                     ? { ...choroplethOptions, legendTitle: colorMeasure.source.displayName }

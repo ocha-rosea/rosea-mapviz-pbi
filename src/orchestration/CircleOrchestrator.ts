@@ -19,6 +19,7 @@ import { calculateCircleScale, applyScaling, findClosestValue } from "../math/ci
 import { MessageService } from "../services/MessageService";
 import { CircleLayerOptionsBuilder } from "../services/LayerOptionBuilders";
 import { BaseOrchestrator } from "./BaseOrchestrator";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 
 /**
  * Orchestrator for scaled circle (proportional symbol) visualizations.
@@ -154,7 +155,16 @@ export class CircleOrchestrator extends BaseOrchestrator {
             this.messages.missingLonLat();
             return undefined;
         }
-        const { longitudes, latitudes, circleSizeValuesObjects, locationIds, tooltipValues, circleLabelValues, circleLabelFormat } = parsed;
+        const {
+            longitudes,
+            latitudes,
+            circleSizeValuesObjects,
+            locationIds,
+            tooltipValues,
+            tooltipFormat,
+            circleLabelValues,
+            circleLabelFormat
+        } = parsed;
         if (!longitudes || !latitudes) return undefined;
 
         const combinedCircleSizeValues = this.combineCircleSizeValues(circleSizeValuesObjects, circleOptions);
@@ -178,6 +188,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             circle1SizeValues: circleSizeValuesObjects[0]?.values as number[] | undefined,
             circle2SizeValues: circleSizeValuesObjects[1]?.values as number[] | undefined,
             tooltipValues,
+            tooltipFormat,
             circleLabelValues,
             circle1Format: circleSizeValuesObjects[0]?.source?.format,
             circle2Format: circleSizeValuesObjects[1]?.source?.format,
@@ -225,7 +236,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
                     selectedScalingMethod,
                     circleOptions,
                     circleMeasureLegendEntries,
-                    circleLegendTitle
+                    circleLegendTitle,
+                    circleSizeValuesObjects?.[0]?.source?.format
                 );
             }
         } else {
@@ -361,7 +373,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
         selectedScalingMethod: string,
         circleOptions: CircleOptions,
         circleMeasureLegendEntries?: CircleMeasureLegendEntry[],
-        legendTitle?: string
+        legendTitle?: string,
+        formatString?: string
     ): void {
         // Override legend title with measure display name(s) if available
         if (legendTitle) {
@@ -412,7 +425,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
             circleOptions,
             undefined,
             undefined,
-            circleMeasureLegendEntries
+            circleMeasureLegendEntries,
+            formatString
         );
 
         this.legendService.showLegend("circle");
@@ -566,6 +580,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             circle1SizeValues?: number[];
             circle2SizeValues?: number[];
             tooltipValues?: (string | number | null)[];
+            tooltipFormat?: string;
             circleLabelValues?: (string | number | null)[];
             circle1Format?: string;
             circle2Format?: string;
@@ -578,7 +593,39 @@ export class CircleOrchestrator extends BaseOrchestrator {
         }
 
         const { labelSource, displayUnits, decimalPlaces } = labelOptions;
-        const { locationIds, circle1SizeValues, circle2SizeValues, tooltipValues, circleLabelValues } = data;
+        const {
+            locationIds,
+            circle1SizeValues,
+            circle2SizeValues,
+            tooltipValues,
+            tooltipFormat,
+            circleLabelValues,
+            circle1Format,
+            circle2Format,
+            circleLabelFormat,
+        } = data;
+
+        const safeCreateFormatter = (formatString?: string) => {
+            if (!formatString) {
+                return undefined;
+            }
+
+            try {
+                return valueFormatter.create({ format: formatString });
+            } catch {
+                return undefined;
+            }
+        };
+
+        const circle1Formatter = safeCreateFormatter(circle1Format);
+        const circle2Formatter = safeCreateFormatter(circle2Format);
+        const circleLabelFormatter = safeCreateFormatter(circleLabelFormat);
+        const tooltipFormatter = safeCreateFormatter(tooltipFormat);
+
+        const formatNumber = (
+            value: number,
+            formatter: ReturnType<typeof valueFormatter.create> | undefined
+        ) => this.formatNumericValue(value, displayUnits, decimalPlaces, formatter);
 
         switch (labelSource) {
             case "field":
@@ -587,7 +634,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
                     if (value === null || value === undefined) return '';
                     // If it's a number, apply formatting
                     if (typeof value === 'number') {
-                        return this.formatNumericValue(value, displayUnits, decimalPlaces);
+                        return formatNumber(value, circleLabelFormatter);
                     }
                     return String(value);
                 });
@@ -598,13 +645,13 @@ export class CircleOrchestrator extends BaseOrchestrator {
             case "size":
                 if (!circle1SizeValues) return undefined;
                 return circle1SizeValues.map((value) => 
-                    this.formatNumericValue(value, displayUnits, decimalPlaces)
+                    formatNumber(value, circle1Formatter)
                 );
 
             case "size2":
                 if (!circle2SizeValues) return undefined;
                 return circle2SizeValues.map((value) => 
-                    this.formatNumericValue(value, displayUnits, decimalPlaces)
+                    formatNumber(value, circle2Formatter)
                 );
 
             case "tooltip":
@@ -613,7 +660,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
                     if (value === null || value === undefined) return '';
                     // If it's a number, apply formatting
                     if (typeof value === 'number') {
-                        return this.formatNumericValue(value, displayUnits, decimalPlaces);
+                        return formatNumber(value, tooltipFormatter);
                     }
                     return String(value);
                 });
@@ -634,7 +681,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
     private formatNumericValue(
         value: number | null | undefined, 
         displayUnits: "auto" | "none" | "thousands" | "millions" | "billions" | "trillions",
-        decimalPlaces: number
+        decimalPlaces: number,
+        formatter?: ReturnType<typeof valueFormatter.create>
     ): string {
         if (value === null || value === undefined) {
             return '';
@@ -683,13 +731,24 @@ export class CircleOrchestrator extends BaseOrchestrator {
                 break;
         }
 
-        // Format with specified decimal places
+        if (formatter) {
+            try {
+                const formatted = formatter.format(scaledValue);
+                if (formatted !== undefined && formatted !== null) {
+                    return `${formatted}${suffix}`;
+                }
+            } catch {
+                // fall through
+            }
+        }
+
+        // Fallback: locale formatting with specified decimal places
         const formattedNumber = scaledValue.toLocaleString(undefined, {
             minimumFractionDigits: decimalPlaces,
             maximumFractionDigits: decimalPlaces
         });
 
-        return formattedNumber + suffix;
+        return `${formattedNumber}${suffix}`;
     }
 
     // findClosestValue moved to src/math/circles.ts

@@ -58,7 +58,9 @@ export class LegendService {
         circleOptions: CircleOptions,
         formatTemplate: string = "{:.0f}",
         customLabels?: string[],
-        measureLegendEntries?: CircleMeasureLegendEntry[]
+        measureLegendEntries?: CircleMeasureLegendEntry[],
+        formatString?: string,
+        cultureSelector?: string
     ) {
         // Clear or create container
         if (!this.circleLegendContainer) {
@@ -161,6 +163,8 @@ export class LegendService {
             svg.removeChild(svg.firstChild);
         }
         maxLabelWidth = 0;
+        const numericFormatter = this.buildValueFormatter(formatString, cultureSelector, sizeValues);
+
         sortedLegendData.forEach((item, index) => {
             // Calculate the Y position so all circles are aligned at the bottom
             const currentY = bottomY - item.radius;
@@ -222,9 +226,21 @@ export class LegendService {
             svg.appendChild(line);
 
             // Use custom label if provided, otherwise format the value
-            const labelText = sortedCustomLabels && sortedCustomLabels[index] 
+            const labelText = sortedCustomLabels && sortedCustomLabels[index]
                 ? sortedCustomLabels[index]
-                : format.formatValue(item.size, formatTemplate);
+                : (() => {
+                    if (numericFormatter) {
+                        try {
+                            const formatted = numericFormatter.format(item.size);
+                            if (formatted !== undefined && formatted !== null) {
+                                return formatted;
+                            }
+                        } catch {
+                            // fall through
+                        }
+                    }
+                    return format.formatValue(item.size, formatTemplate);
+                })();
 
             // Add the corresponding label (aligned to the top of the circle)
             const text = document.createElementNS(

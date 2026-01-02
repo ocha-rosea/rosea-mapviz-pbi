@@ -4,6 +4,7 @@ import * as chroma from "chroma-js";
 import * as topojson from 'topojson-client';
 import { ColorRampManager } from "./ColorRampManager";
 import { ClassificationMethods } from "../constants/strings";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 import { RoleNames } from "../constants/roles";
 import { ChoroplethOptions } from "../types/index";
 import { rewindFeatureCollection } from "../utils/geometry";
@@ -183,6 +184,17 @@ export class ChoroplethDataService {
         // If no format specified, use default conversion
         if (!format) {
             return this.convertToString(value);
+        }
+
+        // Prefer Power BI formatter when we have a format string
+        try {
+            const formatter = valueFormatter.create({ format });
+            const formatted = formatter.format(value);
+            if (formatted !== undefined && formatted !== null) {
+                return String(formatted);
+            }
+        } catch {
+            // fall through to legacy handling
         }
 
         // Handle Date objects with format

@@ -1,6 +1,7 @@
 "use strict";
 import { RoleNames } from "../constants/roles";
 import { DataViewMeasure } from "../types";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 
 /**
  * Result of parsing circle categorical data.
@@ -20,6 +21,8 @@ export interface CircleParseResult {
     locationIds?: string[];
     /** Array of tooltip values (first tooltip measure, formatted) */
     tooltipValues?: (string | number | null)[];
+    /** Format string for tooltip values */
+    tooltipFormat?: string;
     /** Array of circle label values from the CircleLabel data role */
     circleLabelValues?: (string | number | null)[];
     /** Format string for circle label values */
@@ -55,6 +58,17 @@ export function parseCircleCategorical(categorical: powerbi.DataViewCategorical 
         (c) => c.source?.roles?.[RoleNames.CircleLabel]
     );
 
+    const formatStringProp = { objectName: "general", propertyName: "formatString" } as any;
+    const getEffectiveFormatString = (column: any): string | undefined => {
+        if (!column) {
+            return undefined;
+        }
+
+        // Prefer per-visual field formatting when present
+        const fromObjects = valueFormatter.getFormatString(column, formatStringProp, true);
+        return fromObjects ?? column.format;
+    };
+
     return {
         longitudes: lonCategory?.values as number[] | undefined,
         latitudes: latCategory?.values as number[] | undefined,
@@ -65,7 +79,8 @@ export function parseCircleCategorical(categorical: powerbi.DataViewCategorical 
             v === null || v === undefined ? '' : String(v)
         ) as string[] | undefined,
         tooltipValues: tooltipMeasure?.values as (string | number | null)[] | undefined,
+        tooltipFormat: getEffectiveFormatString(tooltipMeasure?.source),
         circleLabelValues: circleLabelMeasure?.values as (string | number | null)[] | undefined,
-        circleLabelFormat: circleLabelMeasure?.source?.format,
+        circleLabelFormat: getEffectiveFormatString(circleLabelMeasure?.source),
     };
 }
