@@ -176,10 +176,14 @@ jobs:
         if [ -z "$PREV_TAG" ]; then
           echo "No previous semantic version tag found, using recent commits"
           # Limit to 50 commits to avoid performance issues with large repositories
-          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges --max-count=50)
+          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges --max-count=50 | grep -E -v 'chore\(build-bump\):|\[build-bump\]' || true)
         else
           echo "Generating changelog from $PREV_TAG to HEAD"
-          COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -E -v 'chore\(build-bump\):|\[build-bump\]' || true)
+        fi
+
+        if [ -z "$COMMITS" ]; then
+          COMMITS="- Maintenance and reliability updates"
         fi
         
         # Save to output using heredoc delimiter for multi-line content
