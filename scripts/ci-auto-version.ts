@@ -42,7 +42,13 @@ function bumpVersion(current: string, bump?: SemverBump): string {
 
 function main() {
   const msg = getLatestCommitMessage();
-  if (/\[(build-bump|semver-bump)\]/i.test(msg)) {
+  const semverEnv = (process.env.SEMVER_BUMP || '').toLowerCase();
+  const bump: SemverBump | undefined = ['major','minor','patch'].includes(semverEnv) ? semverEnv as SemverBump : undefined;
+
+  // Loop guard: skip automated bump commits only when no explicit semantic bump was requested.
+  // This allows workflow_dispatch releases with SEMVER_BUMP to proceed even if the latest
+  // commit message is a prior [build-bump] commit.
+  if (!bump && /\[(build-bump|semver-bump)\]/i.test(msg)) {
     console.log('Skipping: last commit is an automated version bump.');
     return;
   }
@@ -52,9 +58,6 @@ function main() {
   const vizPath = path.join(repoRoot, 'pbiviz.json');
   const pkg = readJson<PackageJson>(pkgPath);
   const viz = readJson<PbivizJson>(vizPath);
-
-  const semverEnv = (process.env.SEMVER_BUMP || '').toLowerCase();
-  const bump: SemverBump | undefined = ['major','minor','patch'].includes(semverEnv) ? semverEnv as SemverBump : undefined;
 
   const newVersion = bumpVersion(pkg.version, bump);
   pkg.version = newVersion;
