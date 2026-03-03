@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD005 MD007 MD022 MD024 MD031 MD032 MD034 MD040 MD060 -->
 # Choropleth Visualization Specification (Concise)
 
 ## Overview

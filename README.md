@@ -40,7 +40,7 @@ Rosea MapViz helps you build interactive Power BI maps using **choropleth region
 
 ## Support
 
-- Report issues: https://github.com/ocha-rosea/rosea-mapviz-pbi/issues
+- Report issues: [GitHub Issues](https://github.com/ocha-rosea/rosea-mapviz-pbi/issues)
 - Technical specification: [spec/main.md](spec/main.md)
 
 ## License

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD022 MD024 MD031 MD032 MD034 MD040 MD060 -->
 # Contributing to Rosea MapViz Power BI Visual 🤝
 
 Thanks for your interest in Rosea MapViz! This page gives you the fastest path to contribute code, docs, or issues.

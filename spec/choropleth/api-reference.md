@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD022 MD024 MD031 MD032 MD034 MD040 MD060 -->
 # Choropleth API Reference (Concise)
 
 Practical reference for classes, options, and common flows used by the choropleth layer.
