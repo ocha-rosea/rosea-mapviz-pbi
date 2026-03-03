@@ -18,6 +18,20 @@ Rosea MapViz helps you build interactive Power BI maps using **choropleth region
 3. Choose basemap, legend, and style settings.
 4. Optional: switch render engine (`SVG` or `Canvas`) for quality/performance.
 
+## Examples
+
+![Sample Bubble Map](assets/sample-bubble%20map.png)
+
+![Sample Donut Chart Map](assets/sample-donut-chart-map.png)
+
+![Sample Hexbin Map](assets/sample%20hexbin%20map.png)
+
+![Sample Combined Choropleth and Circles](assets/sample-combine-choropleth-circles-map.png)
+
+![Pie Chart Map](assets/pie_chart_map.png)
+
+![Choropleth and Pie Map](assets/choropleth_and_pie_map.png)
+
 ## Data roles (what to bind)
 
 - `Boundary ID`: join key for choropleth (e.g., `shapeISO`, `ADM1_PCODE`, `shapeID`)
@@ -26,6 +40,17 @@ Rosea MapViz helps you build interactive Power BI maps using **choropleth region
 - `Color`: choropleth measure
 - `Tooltips`: additional hover measures
 - `Mapbox Access Token` / `MapTiler API Key`: optional credential overrides
+
+## Security note
+
+- Use **public** Mapbox tokens (`pk.*`) only.
+- Prefer Power BI data roles over visual-formatting key entry for credential input:
+  - **Data roles (better):** central model-driven input, easier rotation, and fewer per-visual manual copy/paste points.
+  - **Visual formatting key fields:** stored per visual instance, harder to rotate consistently, and more prone to key sprawl.
+- Best practice: define credentials in a Power BI parameter and map that parameter into the token data role (`Mapbox Access Token` / `MapTiler API Key`).
+- Do not commit real API keys/tokens into reports, templates, docs, or source files.
+- Prefer environment- or tenant-managed secrets for distribution workflows.
+- Note: neither path is a true secret vault; tokens are still delivered to the client visual for map requests.
 
 ## Map types and configuration guides
 

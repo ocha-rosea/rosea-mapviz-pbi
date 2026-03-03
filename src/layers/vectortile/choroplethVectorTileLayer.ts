@@ -627,27 +627,16 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
                     const id = String(feature.get(this.options.idField) ?? '');
                     const selectionId = this.selectionIdLookup.get(id);
 
-                    console.log('[ChoroplethVectorTileLayer] Click:', {
-                        featureId: id,
-                        hasSelectionId: !!selectionId,
-                        selectionIdKey: selectionId ? (selectionId as any).key : null,
-                        lookupSize: this.selectionIdLookup.size,
-                        sampleKeys: Array.from(this.selectionIdLookup.keys()).slice(0, 5)
-                    });
-
                     if (selectionId) {
                         const additive = evt.originalEvent.ctrlKey || evt.originalEvent.metaKey;
                         selectionManager.select(selectionId as any, additive)
                             .then((selectedIds: ISelectionId[]) => {
-                                console.log('[ChoroplethVectorTileLayer] Selection result:', selectedIds.length, 'items selected');
                                 this.selectedIds = selectedIds;
                                 this.changed(); // Trigger re-render with new selection
                             })
-                            .catch((err: any) => {
-                                console.error('[ChoroplethVectorTileLayer] Selection error:', err);
-                            });
+                            .catch(() => {});
                     } else {
-                        console.warn('[ChoroplethVectorTileLayer] No selectionId found for feature:', id);
+                        return;
                     }
                 } else {
                     // Click on empty area - clear selection
