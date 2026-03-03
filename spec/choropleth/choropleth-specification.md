@@ -489,7 +489,7 @@ private getChoroplethOptions(): ChoroplethOptions {
 
 ### Overview
 
-The Rosea MapViz Power BI visual now includes built-in integration with the GeoBoundaries dataset hosted on our CDN at `https://cdn.jsdelivr.net/gh/IM4SEA/geoboundaries-lite`, providing access to high-quality administrative boundary data without requiring external data preparation.
+The Rosea MapViz Power BI visual now includes built-in integration with the GeoBoundaries dataset hosted on our CDN at `https://cdn.jsdelivr.net/gh/ocha-rosea/geoboundaries-lite`, providing access to high-quality administrative boundary data without requiring external data preparation.
 
 ### GeoBoundaries Service Architecture
 

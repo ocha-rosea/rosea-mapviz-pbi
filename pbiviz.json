@@ -6,8 +6,8 @@
         "visualClassName": "RoseaMapViz",
         "version": "0.0.0.36",
         "description": "Minimal Map Visual for Power BI",
-        "supportUrl": "https://github.com/IM4SEA/rosea-mapviz-pbi/issues",
-        "gitHubUrl": "https://github.com/IM4SEA/rosea-mapviz-pbi"
+        "supportUrl": "https://github.com/ocha-rosea/rosea-mapviz-pbi/issues",
+        "gitHubUrl": "https://github.com/ocha-rosea/rosea-mapviz-pbi"
     },
     "apiVersion": "5.11.0",
     "author": {

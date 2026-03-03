@@ -352,7 +352,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions,
         deferAutoFit: boolean,
-        renderToken: number
+        renderToken: number = this.renderVersion
     ): Promise<void> {
         if (renderToken !== this.renderVersion) return;
         // ================================================================================

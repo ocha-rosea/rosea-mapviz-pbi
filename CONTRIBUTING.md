@@ -22,7 +22,7 @@ By participating, you agree to our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### 🐛 Reporting Bugs
 
-Check existing issues first: https://github.com/IM4SEA/rosea-mapviz-pbi/issues
+Check existing issues first: https://github.com/ocha-rosea/rosea-mapviz-pbi/issues
 
 **When submitting a bug report, please include:**
 - Clear, descriptive title
@@ -57,7 +57,7 @@ Add screenshots to help explain the problem.
 
 ### 💡 Suggesting Features
 
-We love ideas! Start here: https://github.com/IM4SEA/rosea-mapviz-pbi/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement
+We love ideas! Start here: https://github.com/ocha-rosea/rosea-mapviz-pbi/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement
 
 **When suggesting features:**
 - Use a clear, descriptive title
@@ -521,8 +521,8 @@ For complete versioning documentation, see [`docs/versioning.md`](docs/versionin
 
 ## Questions?
 
-- **General questions**: [GitHub Discussions](https://github.com/IM4SEA/rosea-mapviz-pbi/discussions)
-- **Bug reports**: [GitHub Issues](https://github.com/IM4SEA/rosea-mapviz-pbi/issues)
+- **General questions**: [GitHub Discussions](https://github.com/ocha-rosea/rosea-mapviz-pbi/discussions)
+- **Bug reports**: [GitHub Issues](https://github.com/ocha-rosea/rosea-mapviz-pbi/issues)
 - **Security issues**: Email ayiembaelvis@gmail.com
 - **Direct contact**: [@ayiemba](https://github.com/ayiemba)
 

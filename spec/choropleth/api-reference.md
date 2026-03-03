@@ -96,7 +96,7 @@ interface ChoroplethDataPoint {
 
 GeoBoundaries base
 ```typescript
-const API = 'https://cdn.jsdelivr.net/gh/IM4SEA/geoboundaries-lite';
+const API = 'https://cdn.jsdelivr.net/gh/ocha-rosea/geoboundaries-lite';
 const url = `${API}/${releaseType}/${country}/${adminLevel}/`;
 ```
 
