@@ -88,8 +88,16 @@ export function hasOpenRedirect(url: string): boolean {
     }
 }
 
-export async function fetchWithTimeout(url: string, timeout: number): Promise<Response> {
+export async function fetchWithTimeout(url: string, timeout: number, externalSignal?: AbortSignal): Promise<Response> {
     const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+        if (externalSignal.aborted) {
+            controller.abort();
+        } else {
+            externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+        }
+    }
     const id = setTimeout(() => controller.abort(), timeout);
     try {
         const response = await fetch(url, { signal: controller.signal });
@@ -98,6 +106,9 @@ export async function fetchWithTimeout(url: string, timeout: number): Promise<Re
         throw new Error("Request timed out or failed.");
     } finally {
         clearTimeout(id);
+        if (externalSignal) {
+            externalSignal.removeEventListener("abort", onExternalAbort);
+        }
     }
 }
 

@@ -125,7 +125,8 @@ export class CircleOrchestrator extends BaseOrchestrator {
         dataService: ChoroplethDataService,
         mapToolsOptions: MapToolsOptions,
         choroplethDisplayed: boolean,
-        labelOptions?: CircleLabelOptions
+        labelOptions?: CircleLabelOptions,
+        deferAutoFit: boolean = false
     ): CircleSvgLayer | CircleCanvasLayer | undefined {
         if (circleOptions.layerControl == false) {
             const group1 = this.svg.select(`#${DomIds.CirclesGroup1}`);
@@ -212,7 +213,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             labelOptions,
         });
 
-        this.renderCircleLayerOnMap(layerOptions, mapToolsOptions, choroplethDisplayed);
+        this.renderCircleLayerOnMap(layerOptions, mapToolsOptions, choroplethDisplayed, deferAutoFit);
 
         const circleMeasureLegendEntries = this.buildCircleMeasureLegendEntries(circleSizeValuesObjects, circleOptions);
 
@@ -324,7 +325,12 @@ export class CircleOrchestrator extends BaseOrchestrator {
      * @param mapToolsOptions - Map tools configuration including render engine
      * @param choroplethDisplayed - Whether choropleth layer is also displayed (affects auto-fit behavior)
      */
-    private renderCircleLayerOnMap(circleLayerOptions: CircleLayerOptions, mapToolsOptions: MapToolsOptions, choroplethDisplayed: boolean): void {
+    private renderCircleLayerOnMap(
+        circleLayerOptions: CircleLayerOptions,
+        mapToolsOptions: MapToolsOptions,
+        choroplethDisplayed: boolean,
+        deferAutoFit: boolean = false
+    ): void {
         if (this.circleLayer) {
             try { (this.circleLayer as any).dispose?.(); } catch {}
             this.map.removeLayer(this.circleLayer);
@@ -335,7 +341,7 @@ export class CircleOrchestrator extends BaseOrchestrator {
             : new CircleSvgLayer(circleLayerOptions);
         this.map.addLayer(this.circleLayer);
 
-        if (choroplethDisplayed === false && mapToolsOptions.lockMapExtent === false) {
+        if (choroplethDisplayed === false && mapToolsOptions.lockMapExtent === false && !deferAutoFit) {
             const anyLayer: any = this.circleLayer as any;
             const extent = anyLayer?.getFeaturesExtent?.();
             if (extent) {

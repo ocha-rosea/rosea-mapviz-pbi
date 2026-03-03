@@ -204,11 +204,52 @@ export class RoseaMapViz implements IVisual {
         );
     }
 
+    private getLayerExtent(layer: any): [number, number, number, number] | undefined {
+        try {
+            const extent = layer?.getFeaturesExtent?.();
+            if (
+                Array.isArray(extent) &&
+                extent.length === 4 &&
+                extent.every((v: number) => typeof v === 'number' && Number.isFinite(v))
+            ) {
+                return extent as [number, number, number, number];
+            }
+        } catch { }
+        return undefined;
+    }
+
+    private fitActiveLayersCombined(): void {
+        if (!this.mapToolsOptions || this.mapToolsOptions.lockMapExtent) return;
+
+        const choroplethExtent = this.getLayerExtent(this.choroplethLayer as any);
+        const circleExtent = this.getLayerExtent(this.circleLayer as any);
+        const extents = [choroplethExtent, circleExtent].filter(Boolean) as [number, number, number, number][];
+        if (extents.length === 0) return;
+
+        const combined: [number, number, number, number] = [...extents[0]] as [number, number, number, number];
+        for (let i = 1; i < extents.length; i += 1) {
+            const e = extents[i];
+            combined[0] = Math.min(combined[0], e[0]);
+            combined[1] = Math.min(combined[1], e[1]);
+            combined[2] = Math.max(combined[2], e[2]);
+            combined[3] = Math.max(combined[3], e[3]);
+        }
+
+        const fitPadding: [number, number, number, number] = [
+            this.mapToolsOptions.mapFitPaddingTop,
+            this.mapToolsOptions.mapFitPaddingRight,
+            this.mapToolsOptions.mapFitPaddingBottom,
+            this.mapToolsOptions.mapFitPaddingLeft
+        ];
+        this.map.getView().fit(combined, { padding: fitPadding, duration: 0 });
+    }
+
     public update(options: VisualUpdateOptions) {
         this.events.renderingStarted(options);
         const elements = this.domManager.getElements();
         
         try {
+            this.choroplethOrchestrator.cancelPendingRender();
             const dataView = options.dataViews[0];
             
             // Always reset to default view at start of update cycle
@@ -331,6 +372,7 @@ export class RoseaMapViz implements IVisual {
             // Zoom control + legend styling
             this.mapService.setZoomControlVisible(Boolean(this.mapToolsOptions.showZoomControl));
             this.updateLegendContainer();
+            try { this.map.updateSize(); } catch {}
 
             // Color ramp + data service (safe)
             let selectedColorRamp;
@@ -348,6 +390,7 @@ export class RoseaMapViz implements IVisual {
 
             // No data -> clear overlays, show landing page, keep basemap visible
             if (!dataView || !dataView.categorical) {
+                this.choroplethOrchestrator.cancelPendingRender();
                 this.svg.selectAll('*').remove();
                 this.domManager.setLegendVisible(false);
                 this.domManager.showLandingPage();
@@ -358,6 +401,10 @@ export class RoseaMapViz implements IVisual {
             this.domManager.hideLandingPage();
 
             this.choroplethDisplayed = choroplethOptions.layerControl;
+            const useCombinedAutoFit =
+                choroplethOptions.layerControl === true &&
+                circleOptions.layerControl === true &&
+                this.mapToolsOptions.lockMapExtent === false;
 
             // Check if interactions are allowed (e.g., false when pinned to dashboard tile)
             const allowInteractions = this.host.hostCapabilities?.allowInteractions !== false;
@@ -375,24 +422,35 @@ export class RoseaMapViz implements IVisual {
                         dataView.categorical,
                         choroplethOptions,
                         this.dataService,
-                        this.mapToolsOptions
+                        this.mapToolsOptions,
+                        useCombinedAutoFit
                     );
                     // If render returned a promise, attach handlers to isolate failures
                     if (res && typeof (res as any).then === 'function') {
                         (res as unknown as Promise<any>)
-                            .then(layer => { this.choroplethLayer = layer as any; this.updateOverlayVisibility(); })
+                            .then(layer => {
+                                this.choroplethLayer = layer as any;
+                                if (useCombinedAutoFit) {
+                                    this.fitActiveLayersCombined();
+                                }
+                                this.updateOverlayVisibility();
+                            })
                             .catch(() => {
                                 try { this.stateManager.displayWarning('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.'); } catch {}
                             });
                     } else {
                         // Non-promise return (defensive): assign directly
                         this.choroplethLayer = res as any;
+                        if (useCombinedAutoFit) {
+                            this.fitActiveLayersCombined();
+                        }
                         this.updateOverlayVisibility();
                     }
                 } catch (err) {
                     this.stateManager.displayWarning('Choropleth render error', 'roseaMapVizWarning: Failed to render choropleth layer.');
                 }
             } else {
+                this.choroplethOrchestrator.cancelPendingRender();
                 const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
                 group.selectAll('*').remove();
                 try { this.svg.select('#choropleth-hitlayer').remove(); } catch {}
@@ -418,16 +476,26 @@ export class RoseaMapViz implements IVisual {
                         this.dataService,
                         this.mapToolsOptions,
                         this.choroplethDisplayed,
-                        circleLabelOptions
+                        circleLabelOptions,
+                        useCombinedAutoFit
                     );
                     if (res && typeof (res as any).then === 'function') {
                         (res as unknown as Promise<any>)
-                            .then(layer => { this.circleLayer = layer as any; this.updateOverlayVisibility(); })
+                            .then(layer => {
+                                this.circleLayer = layer as any;
+                                if (useCombinedAutoFit) {
+                                    this.fitActiveLayersCombined();
+                                }
+                                this.updateOverlayVisibility();
+                            })
                             .catch(() => {
                                 this.stateManager.displayWarning('Circle render error', 'roseaMapVizWarning: Failed to render circle layer.');
                             });
                     } else {
                         this.circleLayer = res as any;
+                        if (useCombinedAutoFit) {
+                            this.fitActiveLayersCombined();
+                        }
                         this.updateOverlayVisibility();
                     }
                 } catch (err) {
@@ -459,7 +527,6 @@ export class RoseaMapViz implements IVisual {
             this.domManager.setLegendVisible(parentLegendVisible);
 
             // Resize and attach map tools
-            try { this.map.updateSize(); } catch {}
             this.mapToolsOrchestrator.attach(this.mapToolsOptions, (extentStr, zoom) =>
                 this.stateManager.persistLockedExtent(extentStr, zoom)
             );
@@ -493,6 +560,7 @@ export class RoseaMapViz implements IVisual {
     }
 
     public destroy(): void {
+        this.choroplethOrchestrator?.cancelPendingRender?.();
         this.map.setTarget(null);
         this.svg.selectAll('*').remove();
         this.domManager.dispose();

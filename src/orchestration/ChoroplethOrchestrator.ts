@@ -44,6 +44,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     private cacheService: CacheService;
     private choroplethLayer: ChoroplethSvgLayer | ChoroplethCanvasLayer | ChoroplethVectorTileLayer | undefined;
     private abortController: AbortController | null = null;
+    private renderVersion: number = 0;
     private choroplethOptsBuilder: ChoroplethLayerOptionsBuilder;
     private uniqueClassification: UniqueClassificationService;
 
@@ -138,6 +139,17 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
     }
 
     /**
+     * Cancels any in-flight choropleth render work and invalidates stale async completions.
+     */
+    public cancelPendingRender(): void {
+        this.renderVersion += 1;
+        if (this.abortController) {
+            try { this.abortController.abort(); } catch {}
+            this.abortController = null;
+        }
+    }
+
+    /**
      * Main render method for choropleth visualization.
      * 
      * Orchestrates the full rendering pipeline:
@@ -158,8 +170,10 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         categorical: any,
         choroplethOptions: ChoroplethOptions,
         dataService: ChoroplethDataService,
-        mapToolsOptions: MapToolsOptions
+        mapToolsOptions: MapToolsOptions,
+        deferAutoFit: boolean = false
     ): Promise<ChoroplethSvgLayer | ChoroplethCanvasLayer | undefined> {
+        const renderToken = ++this.renderVersion;
         if (choroplethOptions.layerControl == false) {
             const group = this.svg.select(`#${DomIds.ChoroplethGroup}`);
             group.selectAll("*").remove();
@@ -193,7 +207,9 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             dataPoints,
             validPCodes,
             dataService,
-            mapToolsOptions
+            mapToolsOptions,
+            deferAutoFit,
+            renderToken
         );
 
         if (this.choroplethLayer) {
@@ -334,13 +350,16 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         dataPoints: any[],
         validPCodes: string[],
         dataService: ChoroplethDataService,
-        mapToolsOptions: MapToolsOptions
+        mapToolsOptions: MapToolsOptions,
+        deferAutoFit: boolean,
+        renderToken: number
     ): Promise<void> {
+        if (renderToken !== this.renderVersion) return;
         // ================================================================================
         // MAPBOX TILESET SOURCE - Vector Tiles (MVT) with streaming tiles, no fetch
         // ================================================================================
         if (choroplethOptions.boundaryDataSource === "mapbox") {
-            await this.renderMapboxVectorTileLayer(choroplethOptions, classBreaks, colorScale, dataPoints, mapToolsOptions, dataService);
+            await this.renderMapboxVectorTileLayer(choroplethOptions, classBreaks, colorScale, dataPoints, mapToolsOptions, dataService, renderToken);
             return;
         }
 
@@ -414,8 +433,10 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
 
         if (this.abortController) this.abortController.abort();
         this.abortController = new AbortController();
+        const currentSignal = this.abortController.signal;
 
             try {
+                if (renderToken !== this.renderVersion || currentSignal.aborted) return;
                 const data = await this.cacheService.getOrFetch(cacheKey, async () => {
                 // Append a client identifier to outbound request URL
                     const fetchUrl = requestHelpers.appendClientIdQuery(serviceUrl);
@@ -423,7 +444,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                     if (!requestHelpers.enforceHttps(fetchUrl)) { this.messages.geoTopoFetchNetworkError(); return null; }
                     let response: Response;
                     try {
-                        response = await requestHelpers.fetchWithTimeout(fetchUrl, VisualConfig.NETWORK.FETCH_TIMEOUT_MS);
+                        response = await requestHelpers.fetchWithTimeout(fetchUrl, VisualConfig.NETWORK.FETCH_TIMEOUT_MS, currentSignal);
                     } catch (e) {
                         this.messages.geoTopoFetchNetworkError(); return null;
                     }
@@ -434,6 +455,8 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                     if (!(await requestHelpers.isValidJsonResponse(json))) { this.messages.invalidGeoTopoData(); return null; }
                     return { data: json, response };
             }, { respectCacheHeaders: true });
+
+                if (renderToken !== this.renderVersion || currentSignal.aborted) return;
 
                 if (!data || !choroplethOptions.layerControl) {
                     // Surface a warning so users can see something happened
@@ -562,7 +585,8 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
                 },
             });
 
-            this.renderChoroplethLayerOnMap(layerOptions, mapToolsOptions);
+            if (renderToken !== this.renderVersion || currentSignal.aborted) return;
+            this.renderChoroplethLayerOnMap(layerOptions, mapToolsOptions, deferAutoFit);
         } catch (error) { this.messages.choroplethFetchError(); }
     }
 
@@ -583,8 +607,10 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
         colorScale: string[],
         dataPoints: any[],
         mapToolsOptions: MapToolsOptions,
-        dataService: ChoroplethDataService
+        dataService: ChoroplethDataService,
+        renderToken: number
     ): Promise<void> {
+        if (renderToken !== this.renderVersion) return;
         // Validate required Mapbox settings
         if (!choroplethOptions.mapboxTilesetId?.trim()) {
             this.host.displayWarningIcon(
@@ -655,6 +681,11 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             lockMapExtent: mapToolsOptions.lockMapExtent,
         });
 
+        if (renderToken !== this.renderVersion) {
+            try { (vtLayer as any).dispose?.(); } catch {}
+            return;
+        }
+
         this.choroplethLayer = vtLayer;
         this.map.addLayer(vtLayer);
         
@@ -671,7 +702,8 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
      */
     private renderChoroplethLayerOnMap(
         layerOptions: ChoroplethLayerOptions,
-        mapToolsOptions: MapToolsOptions
+        mapToolsOptions: MapToolsOptions,
+        deferAutoFit: boolean = false
     ): void {
         if (this.choroplethLayer) {
             try { (this.choroplethLayer as any).dispose?.(); } catch {}
@@ -682,7 +714,7 @@ export class ChoroplethOrchestrator extends BaseOrchestrator {
             : new ChoroplethSvgLayer(layerOptions);
         this.map.addLayer(this.choroplethLayer);
         try { (this.choroplethLayer as any).attachHitLayer?.(this.map); } catch {}
-        if (mapToolsOptions.lockMapExtent === false) {
+        if (mapToolsOptions.lockMapExtent === false && !deferAutoFit) {
             const anyLayer: any = this.choroplethLayer as any;
             const extent = anyLayer?.getFeaturesExtent?.();
             if (extent) {
