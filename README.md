@@ -18,20 +18,6 @@ Rosea MapViz helps you build interactive Power BI maps using **choropleth region
 3. Choose basemap, legend, and style settings.
 4. Optional: switch render engine (`SVG` or `Canvas`) for quality/performance.
 
-## Examples
-
-![Sample Bubble Map](assets/sample-bubble%20map.png)
-
-![Sample Donut Chart Map](assets/sample-donut-chart-map.png)
-
-![Sample Hexbin Map](assets/sample%20hexbin%20map.png)
-
-![Sample Combined Choropleth and Circles](assets/sample-combine-choropleth-circles-map.png)
-
-![Pie Chart Map](assets/pie_chart_map.png)
-
-![Choropleth and Pie Map](assets/choropleth_and_pie_map.png)
-
 ## Data roles (what to bind)
 
 - `Boundary ID`: join key for choropleth (e.g., `shapeISO`, `ADM1_PCODE`, `shapeID`)
