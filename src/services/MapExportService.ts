@@ -37,6 +37,7 @@ export interface MapStateExportPayload {
     mapTools: {
         renderEngine: string | null;
         lockMapExtent: boolean | null;
+        showExportButton: boolean | null;
         lockedMapExtent: string | null;
         lockedMapZoom: number | null;
     };
@@ -83,6 +84,7 @@ export class MapExportService {
             mapTools: {
                 renderEngine: args.mapToolsOptions?.renderEngine ?? null,
                 lockMapExtent: args.mapToolsOptions?.lockMapExtent ?? null,
+                showExportButton: args.mapToolsOptions?.showExportButton ?? null,
                 lockedMapExtent: args.mapToolsOptions?.lockedMapExtent ?? null,
                 lockedMapZoom: args.mapToolsOptions?.lockedMapZoom ?? null
             },

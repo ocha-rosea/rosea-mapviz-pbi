@@ -48,7 +48,43 @@ Implementation notes:
 - `ExportContent` is declared as nonessential in `capabilities.json`.
 - The visual checks `downloadService.exportStatus()` before download.
 - The visual exports `rosea-mapviz-map-state-*.json` through `exportVisualsContentExtended()`.
-- The export entry point is an in-visual map export button. Embedded host applications can additionally add their own context-menu command and route it to host-side behavior.
+- The export entry point is a compact in-visual download icon button. Publishers can hide it with the `Show Export Button` setting under Map Tools. Embedded host applications can additionally add their own context-menu command and route it to host-side behavior.
+
+The Phase 1 button is a small square download icon placed near the top-left map controls. It avoids the common top-right legend position and can be disabled by report publishers if it conflicts with a particular report layout.
+
+Example Phase 1 output:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "visual": "Rosea MapViz",
+  "exportedAt": "2026-05-06T12:34:56.000Z",
+  "viewport": { "width": 800, "height": 600 },
+  "map": {
+    "center": [10, 20],
+    "zoom": 6,
+    "rotation": 0,
+    "extent": [1, 2, 3, 4]
+  },
+  "layers": {
+    "choroplethVisible": true,
+    "circlesVisible": true,
+    "svgOverlayVisible": true,
+    "legendVisible": true,
+    "canvasOverlayIds": ["circles-canvas"]
+  },
+  "mapTools": {
+    "renderEngine": "canvas",
+    "lockMapExtent": false,
+    "showExportButton": true,
+    "lockedMapExtent": "",
+    "lockedMapZoom": null
+  },
+  "warnings": [
+    "This Phase 1 export contains map state and metadata only. Image, SVG, and PDF export are planned for later phases."
+  ]
+}
+```
 
 ### Phase 2: Export Overlay SVG/XML
 

@@ -1055,6 +1055,11 @@
             "bool": true
           }
         },
+        "showExportButton": {
+          "type": {
+            "bool": true
+          }
+        },
         "lockedMapExtent": {
           "type": {
             "text": true

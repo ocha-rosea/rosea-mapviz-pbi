@@ -17,3 +17,12 @@ describe('OptionsService.getChoroplethOptions', () => {
     expect(o.locationPcodeNameId).toBe('customKey');
   });
 });
+
+describe('OptionsService.getMapToolsOptions', () => {
+  it('reads the publisher export button setting', () => {
+    const model = new RoseaMapVizFormattingSettingsModel();
+    model.mapToolsVisualCardSettings.showExportButton.value = false;
+    const options = OptionsService.getMapToolsOptions(model);
+    expect(options.showExportButton).toBe(false);
+  });
+});

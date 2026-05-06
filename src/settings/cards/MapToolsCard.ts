@@ -37,6 +37,12 @@ export class MapToolsVisualCardSettings extends formattingSettings.SimpleCard {
         value: true
     });
 
+    showExportButton: formattingSettings.ToggleSwitch = new formattingSettings.ToggleSwitch({
+        name: "showExportButton",
+        displayName: "Show Export Button",
+        value: true
+    });
+
     lockedMapExtent: formattingSettings.TextInput = new formattingSettings.TextInput({
         name: "lockedMapExtent",
         displayName: "Locked Map Extent",
@@ -84,6 +90,7 @@ export class MapToolsVisualCardSettings extends formattingSettings.SimpleCard {
         this.renderEngine,
         this.lockMapExtent,
         this.showZoomControl,
+        this.showExportButton,
         this.lockedMapExtent,
         this.lockedMapZoom,
         this.mapFitPaddingTop,

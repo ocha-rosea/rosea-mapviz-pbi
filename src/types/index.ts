@@ -565,6 +565,7 @@ export interface HeatmapOptions {
 export interface MapToolsOptions {
     lockMapExtent: boolean;
     showZoomControl: boolean;
+    showExportButton: boolean;
     renderEngine?: 'svg' | 'canvas';
 
     lockedMapExtent: string; // Stores the locked map extent as a comma-separated string: "minX,minY,maxX,maxY"

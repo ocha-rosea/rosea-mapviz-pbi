@@ -25,4 +25,11 @@ describe('mapToolsVisualCardSettings.applyConditionalDisplayRules', () => {
     // User's choice should be preserved
     expect(card.showZoomControl.value).toBe(true);
   });
+
+  it('keeps export button toggle visible for publishers', () => {
+    card.showExportButton.value = false;
+    card.applyConditionalDisplayRules();
+    expect(card.showExportButton.visible).not.toBe(false);
+    expect(card.showExportButton.value).toBe(false);
+  });
 });

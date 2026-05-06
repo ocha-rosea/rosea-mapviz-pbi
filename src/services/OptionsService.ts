@@ -66,6 +66,7 @@ export class OptionsService {
             renderEngine: maptoolsSettings.renderEngine.value.value as any,
             lockMapExtent: maptoolsSettings.lockMapExtent.value,
             showZoomControl: maptoolsSettings.showZoomControl.value,
+            showExportButton: maptoolsSettings.showExportButton.value,
             lockedMapExtent: maptoolsSettings.lockedMapExtent.value,
             lockedMapZoom: maptoolsSettings.lockedMapZoom.value,
             mapFitPaddingTop: maptoolsSettings.mapFitPaddingTop.value ?? 20,

@@ -212,6 +212,11 @@ export class RoseaMapViz implements IVisual {
         );
     }
 
+    private updateExportButtonVisibility(): void {
+        const elements = this.domManager.getElements();
+        elements.exportButton.style.display = this.mapToolsOptions?.showExportButton === false ? "none" : "flex";
+    }
+
     private getExportStatusWarning(status: powerbi.PrivilegeStatus): string {
         switch (status) {
             case powerbi.PrivilegeStatus.NotDeclared:
@@ -323,6 +328,7 @@ export class RoseaMapViz implements IVisual {
             this.visualFormattingSettingsModel = this.formattingSettingsService
                 .populateFormattingSettingsModel(RoseaMapVizFormattingSettingsModel, options.dataViews[0]);
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
+            this.updateExportButtonVisibility();
 
             // Detect high contrast mode
             const colorPalette = this.host.colorPalette as ISandboxExtendedColorPalette;
@@ -420,6 +426,7 @@ export class RoseaMapViz implements IVisual {
                 mapboxAccessToken: mapboxCredential,
             });
             this.mapToolsOptions = OptionsService.getMapToolsOptions(this.visualFormattingSettingsModel);
+            this.updateExportButtonVisibility();
 
             // User-driven layer toggles (no auto state)
             circleOptions.layerControl = circleOptions.layerControl;

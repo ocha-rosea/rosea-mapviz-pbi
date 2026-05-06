@@ -42,6 +42,7 @@ describe('MapExportService', () => {
                 renderEngine: 'canvas',
                 lockMapExtent: true,
                 showZoomControl: true,
+                showExportButton: true,
                 lockedMapExtent: '1,2,3,4',
                 lockedMapZoom: 6,
                 mapFitPaddingTop: 0,
@@ -82,6 +83,7 @@ describe('MapExportService', () => {
         expect(payload.mapTools).toMatchObject({
             renderEngine: 'canvas',
             lockMapExtent: true,
+            showExportButton: true,
             lockedMapExtent: '1,2,3,4',
             lockedMapZoom: 6
         });
@@ -104,6 +106,7 @@ describe('MapExportService', () => {
             mapTools: {
                 renderEngine: null,
                 lockMapExtent: null,
+                showExportButton: null,
                 lockedMapExtent: null,
                 lockedMapZoom: null
             },

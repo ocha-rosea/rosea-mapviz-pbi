@@ -126,9 +126,23 @@ export class DOMManager {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "rosea-map-export-button";
-        button.textContent = "Export";
         button.title = "Export map";
         button.setAttribute("aria-label", "Export map");
+
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+
+        const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        arrowPath.setAttribute("d", "M12 3v10.6l3.3-3.3 1.4 1.4L12 16.4l-4.7-4.7 1.4-1.4 3.3 3.3V3h2z");
+
+        const trayPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        trayPath.setAttribute("d", "M5 19h14v-4h2v6H3v-6h2v4z");
+
+        svg.appendChild(arrowPath);
+        svg.appendChild(trayPath);
+        button.appendChild(svg);
         return button;
     }
 
