@@ -6,6 +6,7 @@ export default [
         ignores: [
             "node_modules/**", 
             "dist/**", 
+            "coverage/**",
             ".vscode/**", 
             ".tmp/**",
             "scripts/**"  // Ignore scripts directory for now

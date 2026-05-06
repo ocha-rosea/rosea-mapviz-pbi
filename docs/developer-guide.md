@@ -58,4 +58,5 @@ See [docs/versioning.md](versioning.md) for policy and examples.
 - Contribution process: [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - Versioning policy: [versioning.md](versioning.md)
 - Simplification tuning: [simplification.md](simplification.md)
+- Development backlog: [development/improvement-backlog.md](development/improvement-backlog.md)
 - Product spec: [../spec/main.md](../spec/main.md)

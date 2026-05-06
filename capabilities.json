@@ -1190,10 +1190,6 @@
     {
       "name": "LocalStorage",
       "essential": true
-    },
-    {
-      "name": "ExportContent",
-      "essential": true
     }
   ]
 }
