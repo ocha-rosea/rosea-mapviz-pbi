@@ -28,6 +28,8 @@ Nonessential keeps the visual usable when downloads are blocked by tenant policy
 
 ### Phase 1: Export Map State JSON
 
+Status: implemented.
+
 Ship a low-risk export that downloads a JSON document containing map state and rendering metadata:
 
 - visual name and export schema version
@@ -40,6 +42,13 @@ Ship a low-risk export that downloads a JSON document containing map state and r
 - warning when download permission is unavailable
 
 This verifies the privilege, host API, UX, and tests without attempting fragile image capture.
+
+Implementation notes:
+
+- `ExportContent` is declared as nonessential in `capabilities.json`.
+- The visual checks `downloadService.exportStatus()` before download.
+- The visual exports `rosea-mapviz-map-state-*.json` through `exportVisualsContentExtended()`.
+- The export entry point is an in-visual map export button. Embedded host applications can additionally add their own context-menu command and route it to host-side behavior.
 
 ### Phase 2: Export Overlay SVG/XML
 

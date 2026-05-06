@@ -22,6 +22,8 @@ export { CircleLayerOptionsBuilder, ChoroplethLayerOptionsBuilder } from "./Laye
 export { LegendService } from "./LegendService";
 export type { CircleMeasureLegendEntry } from "./LegendService";
 export { MapService } from "./MapService";
+export { MapExportService } from "./MapExportService";
+export type { MapStateExportArgs, MapStateExportPayload } from "./MapExportService";
 export { MessageService } from "./MessageService";
 export { OptionsService } from "./OptionsService";
 export { ZoomControlManager } from "./ZoomControlManager";

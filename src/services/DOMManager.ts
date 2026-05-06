@@ -26,6 +26,8 @@ export interface DOMConfig {
 export interface DOMElements {
     /** Container for legend elements */
     legendContainer: HTMLElement;
+    /** Button used to trigger map export */
+    exportButton: HTMLButtonElement;
     /** SVG element for vector overlays */
     svgOverlay: SVGSVGElement;
     /** Container that holds overlay elements (SVG and canvases) */
@@ -57,6 +59,7 @@ export interface LegendPositionConfig {
 export class DOMManager {
     private container: HTMLElement;
     private legendContainer: HTMLElement;
+    private exportButton: HTMLButtonElement;
     private svgOverlay: SVGSVGElement;
     private svgContainer: HTMLElement;
     private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
@@ -83,6 +86,9 @@ export class DOMManager {
         this.legendContainer = this.createLegendContainer();
         this.container.appendChild(this.legendContainer);
 
+        this.exportButton = this.createExportButton();
+        this.container.appendChild(this.exportButton);
+
         // Create SVG overlay
         this.svgOverlay = this.createSvgOverlay();
         this.svg = d3.select(this.svgOverlay);
@@ -98,6 +104,9 @@ export class DOMManager {
         if (!this.legendContainer.parentElement) {
             this.container.appendChild(this.legendContainer);
         }
+        if (!this.exportButton.parentElement) {
+            this.container.appendChild(this.exportButton);
+        }
     }
 
     /**
@@ -111,6 +120,16 @@ export class DOMManager {
         container.style.display = "none";
         container.style.pointerEvents = 'none';
         return container;
+    }
+
+    private createExportButton(): HTMLButtonElement {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "rosea-map-export-button";
+        button.textContent = "Export";
+        button.title = "Export map";
+        button.setAttribute("aria-label", "Export map");
+        return button;
     }
 
     /**
@@ -153,6 +172,7 @@ export class DOMManager {
     public getElements(): DOMElements {
         return {
             legendContainer: this.legendContainer,
+            exportButton: this.exportButton,
             svgOverlay: this.svgOverlay,
             svgContainer: this.svgContainer,
             svg: this.svg

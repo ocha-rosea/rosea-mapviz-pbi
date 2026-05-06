@@ -14,7 +14,7 @@ This backlog tracks implementation candidates from security, compliance, perform
 | ID | Priority | Status | Item | Notes |
 | --- | --- | --- | --- | --- |
 | SEC-001 | High | todo | Narrow `WebAccess` privileges | Replace broad wildcard hosts with an audited allowlist for actual basemap, boundary, and vector tile sources. Keep external access HTTPS-only. |
-| SEC-002 | High | in-progress | Remove unused visual privileges | Removed unused `ExportContent`. Reassess `LocalStorage` after cache/debug usage is clarified. |
+| SEC-002 | High | in-progress | Review visual privileges | `ExportContent` is now used for Phase 1 map export and declared as nonessential. Reassess `LocalStorage` after cache/debug usage is clarified. |
 | SEC-003 | High | todo | Centralize outbound URL policy | Ensure all dynamic URLs pass one allowlist validator aligned with `capabilities.json`, including GeoBoundaries manifest entries and custom boundary URLs. |
 | SEC-004 | Medium | todo | Validate map service credentials consistently | Apply public-token checks for Mapbox basemaps and vector tiles, avoid logging URLs containing tokens, and document that visual settings/data roles are not secret storage. |
 | SEC-005 | Medium | todo | Review client-side cache storage | Clarify whether IndexedDB/local storage behavior is necessary in Power BI sandboxed runtime. Keep fallback behavior harmless when storage is unavailable. |
@@ -29,7 +29,7 @@ This backlog tracks implementation candidates from security, compliance, perform
 | PERF-003 | Medium | todo | Reuse overlay elements where safe | Replace full SVG overlay clears with keyed updates in hot paths after behavior tests are in place. |
 | PERF-004 | Medium | todo | Dispose vector tile timers/listeners fully | Track timer IDs and temporary tile listeners in vector tile layers so tests and runtime teardown do not leak handles. |
 | PERF-005 | Medium | todo | Add benchmark fixtures | Add repeatable fixtures for large choropleth and circle datasets to measure render time, memory pressure, and interaction latency. |
-| PERF-006 | High | todo | Implement phased map export | Start with map state JSON through the Power BI download service, then evaluate SVG/XML, PDF, and raster snapshot phases. See [map-export.md](map-export.md). |
+| PERF-006 | High | in-progress | Implement phased map export | Phase 1 exports map state JSON through the Power BI download service. Next phases evaluate SVG/XML, PDF, and raster snapshot output. See [map-export.md](map-export.md). |
 
 ## Codebase Organization
 
@@ -57,5 +57,5 @@ This batch started with low-risk hygiene that should not alter visual rendering 
 
 - Done: TOOL-001 ignored generated coverage files during lint.
 - Done: TOOL-002 removed unused dependency entries and made `d3-geo` explicit.
-- In progress: SEC-002 removed unused `ExportContent`; `LocalStorage` remains pending cache/debug review.
-- Planned: PERF-006 will reintroduce `ExportContent` as nonessential when export implementation begins.
+- In progress: SEC-002 keeps `ExportContent` as nonessential for Phase 1 map export; `LocalStorage` remains pending cache/debug review.
+- In progress: PERF-006 implemented Phase 1 map state JSON export; richer visual output formats remain planned.

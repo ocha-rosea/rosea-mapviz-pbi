@@ -38,7 +38,8 @@ import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import IVisualEventService = powerbi.extensibility.IVisualEventService;
-import { MessageService, DOMManager, StateManager, LocalizationService } from "./services";
+import IDownloadService = powerbi.extensibility.IDownloadService;
+import { MessageService, DOMManager, StateManager, LocalizationService, MapExportService } from "./services";
 
 import { RoseaMapVizFormattingSettingsModel } from "./settings"; import "ol/ol.css";
 import Map from "ol/Map";
@@ -62,6 +63,7 @@ export class RoseaMapViz implements IVisual {
     private visualFormattingSettingsModel: RoseaMapVizFormattingSettingsModel;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
     private selectionManager: ISelectionManager;
+    private downloadService: IDownloadService;
     
     // DOM Management
     private domManager: DOMManager;
@@ -120,11 +122,17 @@ export class RoseaMapViz implements IVisual {
         // Initialize Power BI services
         this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService);
         this.selectionManager = this.host.createSelectionManager();
+        this.downloadService = this.host.downloadService;
         
         // Initialize DOM Manager and create DOM elements
         this.domManager = new DOMManager({ container: this.container });
         this.domManager.setLocalizationService(this.localizationService);
         const elements = this.domManager.getElements();
+        elements.exportButton.addEventListener("click", () => {
+            this.exportMapState().catch(() => {
+                this.stateManager.displayWarning("Map export error", "roseaMapVizWarning: Failed to export map state.");
+            });
+        });
         
         // Initialize legend service
         this.legendService = new LegendService(elements.legendContainer);
@@ -202,6 +210,61 @@ export class RoseaMapViz implements IVisual {
             this.choroplethLayer as any,
             this.circleLayer as any
         );
+    }
+
+    private getExportStatusWarning(status: powerbi.PrivilegeStatus): string {
+        switch (status) {
+            case powerbi.PrivilegeStatus.NotDeclared:
+                return "roseaMapVizWarning: Map export is not declared in visual privileges.";
+            case powerbi.PrivilegeStatus.NotSupported:
+                return "roseaMapVizWarning: Map export is not supported in this Power BI host.";
+            case powerbi.PrivilegeStatus.DisabledByAdmin:
+                return "roseaMapVizWarning: Map export is disabled by tenant policy.";
+            default:
+                return "roseaMapVizWarning: Map export is not available.";
+        }
+    }
+
+    private async exportMapState(): Promise<void> {
+        const elements = this.domManager.getElements();
+        elements.exportButton.disabled = true;
+
+        try {
+            if (!this.downloadService?.exportStatus || !this.downloadService?.exportVisualsContentExtended) {
+                this.stateManager.displayWarning("Map export unavailable", "roseaMapVizWarning: The Power BI download service is not available in this host.");
+                return;
+            }
+
+            const status = await this.downloadService.exportStatus();
+            if (status !== powerbi.PrivilegeStatus.Allowed) {
+                this.stateManager.displayWarning("Map export unavailable", this.getExportStatusWarning(status));
+                return;
+            }
+
+            const exportedAt = new Date();
+            const payload = MapExportService.buildMapStatePayload({
+                map: this.map,
+                container: this.container,
+                svgOverlay: elements.svgOverlay,
+                svgContainer: elements.svgContainer,
+                legendContainer: elements.legendContainer,
+                mapToolsOptions: this.mapToolsOptions,
+                choroplethLayer: this.choroplethLayer,
+                circleLayer: this.circleLayer,
+                exportedAt
+            });
+
+            await this.downloadService.exportVisualsContentExtended(
+                MapExportService.serializePayload(payload),
+                MapExportService.createFileName(exportedAt),
+                "json",
+                "Rosea MapViz map state export"
+            );
+        } catch {
+            this.stateManager.displayWarning("Map export error", "roseaMapVizWarning: Failed to export map state.");
+        } finally {
+            elements.exportButton.disabled = false;
+        }
     }
 
     private getLayerExtent(layer: any): [number, number, number, number] | undefined {
