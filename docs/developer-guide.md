@@ -59,4 +59,5 @@ See [docs/versioning.md](versioning.md) for policy and examples.
 - Versioning policy: [versioning.md](versioning.md)
 - Simplification tuning: [simplification.md](simplification.md)
 - Development backlog: [development/improvement-backlog.md](development/improvement-backlog.md)
+- Map export plan: [development/map-export.md](development/map-export.md)
 - Product spec: [../spec/main.md](../spec/main.md)

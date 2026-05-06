@@ -29,6 +29,7 @@ This backlog tracks implementation candidates from security, compliance, perform
 | PERF-003 | Medium | todo | Reuse overlay elements where safe | Replace full SVG overlay clears with keyed updates in hot paths after behavior tests are in place. |
 | PERF-004 | Medium | todo | Dispose vector tile timers/listeners fully | Track timer IDs and temporary tile listeners in vector tile layers so tests and runtime teardown do not leak handles. |
 | PERF-005 | Medium | todo | Add benchmark fixtures | Add repeatable fixtures for large choropleth and circle datasets to measure render time, memory pressure, and interaction latency. |
+| PERF-006 | High | todo | Implement phased map export | Start with map state JSON through the Power BI download service, then evaluate SVG/XML, PDF, and raster snapshot phases. See [map-export.md](map-export.md). |
 
 ## Codebase Organization
 
@@ -57,3 +58,4 @@ This batch started with low-risk hygiene that should not alter visual rendering 
 - Done: TOOL-001 ignored generated coverage files during lint.
 - Done: TOOL-002 removed unused dependency entries and made `d3-geo` explicit.
 - In progress: SEC-002 removed unused `ExportContent`; `LocalStorage` remains pending cache/debug review.
+- Planned: PERF-006 will reintroduce `ExportContent` as nonessential when export implementation begins.
