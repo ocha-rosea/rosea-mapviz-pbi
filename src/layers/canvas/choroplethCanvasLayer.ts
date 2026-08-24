@@ -1,4 +1,4 @@
-import { Layer } from 'ol/layer.js';
+import Layer from 'ol/layer/Layer.js';
 import { FrameState } from 'ol/Map';
 import { State } from 'ol/source/Source';
 import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../../types';
@@ -9,6 +9,7 @@ import { selectionOpacity } from '../../utils/graphics';
 import { getFeatureColor } from '../../utils/color';
 import type { Extent } from 'ol/extent.js';
 import { transformExtent } from 'ol/proj.js';
+import { toOlLayerOptions } from "../olLayerOptions";
 
 const NO_DATA_COLOR = "rgba(0,0,0,0)";
 const isNoDataValue = (value: any): boolean => {
@@ -42,7 +43,7 @@ export class ChoroplethCanvasLayer extends Layer {
   private geojson: any;
 
   constructor(options: ChoroplethLayerOptions) {
-    super({ ...options, zIndex: options.zIndex || 10 });
+    super(toOlLayerOptions(options));
     this.options = options;
     this.geojson = options.geojson;
     const pCodes = options.categoryValues as string[];

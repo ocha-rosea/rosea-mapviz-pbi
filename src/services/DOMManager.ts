@@ -13,6 +13,19 @@ import { MAPVIZ_LOGO_PATHS, MAPVIZ_LOGO_VIEWBOX, MAPVIZ_LOGO_FILL } from "../ass
 import type { LocalizationService } from "./LocalizationService";
 
 /**
+ * Overlay groups owned by this visual. Clearing is scoped to these so unrelated
+ * SVG content in the container is never removed.
+ */
+const OVERLAY_GROUP_SELECTORS = [
+    `#${DomIds.ChoroplethGroup}`,
+    `#${DomIds.CirclesGroup1}`,
+    `#${DomIds.CirclesGroup2}`,
+    `#${DomIds.CircleLabelsGroup}`,
+    '#choropleth-hitlayer',
+    '#circles-hitlayer'
+];
+
+/**
  * Configuration for creating the visual's DOM structure.
  */
 export interface DOMConfig {
@@ -150,11 +163,9 @@ export class DOMManager {
      * Creates the SVG overlay element for vector graphics.
      */
     private createSvgOverlay(): SVGSVGElement {
-        // Check if one already exists
-        const existing = this.container.querySelector('svg') as SVGSVGElement;
-        if (existing) {
-            return existing;
-        }        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        // Always build a dedicated overlay. Reusing whatever `svg` the container
+        // already held would adopt unrelated inline icons such as the export button.
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.id = DomIds.SvgOverlay;
         svg.style.position = 'absolute';
         svg.style.top = '0';
@@ -311,10 +322,20 @@ export class DOMManager {
     }
 
     /**
-     * Clears all SVG content.
+     * Removes the overlay groups this visual owns, leaving any other overlay
+     * content (and the surrounding DOM) untouched.
+     */
+    public clearOverlayGroups(): void {
+        OVERLAY_GROUP_SELECTORS.forEach(selector => {
+            try { this.svg.selectAll(selector).remove(); } catch { }
+        });
+    }
+
+    /**
+     * Clears the visual's SVG content and hides the overlay.
      */
     public clearSvg(): void {
-        this.svg.selectAll('*').remove();
+        this.clearOverlayGroups();
         this.svgOverlay.style.display = 'none';
     }
 
@@ -352,7 +373,7 @@ export class DOMManager {
     public dispose(): void {
         try {
             // Clear SVG content
-            this.svg.selectAll('*').remove();
+            this.clearOverlayGroups();
             
             // Remove containers from DOM
             if (this.legendContainer.parentElement) {
@@ -373,120 +394,115 @@ export class DOMManager {
     public showLandingPage(): void {
         if (this.landingPage) return; // Already showing
 
+        const ls = this.localizationService;
+        const roleName = (key: string, fallback: string) => ls?.get(key) || fallback;
+
         this.landingPage = document.createElement('div');
         this.landingPage.className = 'rosea-landing-page';
 
-        // Get localized strings (with fallbacks)
-        const ls = this.localizationService;
-        const strings = {
-            title: ls?.getLandingTitle() || 'ROSEA MapViz',
-            description: ls?.getLandingDescription() || 'Custom Power BI Visual for Humanitarian Maps',
-            gettingStarted: ls?.getLandingGettingStarted() || 'Getting Started',
-            choroplethMap: ls?.getLandingChoroplethMap() || 'Choropleth Map:',
-            choroplethInstruction: ls?.getLandingChoroplethInstructions() || 'Add Boundary ID and Choropleth Color fields',
-            scaledCircles: ls?.getLandingScaledCircles() || 'Scaled Circles:',
-            circlesInstruction: ls?.getLandingScaledCirclesInstructions() || 'Add Longitude, Latitude, and Circle Size fields',
-            tip: ls?.getLandingTip() || '💡 Tip: Configure basemap and styling in the Format pane',
-            boundaryId: ls?.get("Role_BoundaryID") || 'Boundary ID',
-            choroplethColor: ls?.get("Role_ChoroplethColor") || 'Choropleth Color',
-            longitude: ls?.get("Role_Longitude") || 'Longitude',
-            latitude: ls?.get("Role_Latitude") || 'Latitude',
-            circleSize: ls?.get("Role_CircleSize") || 'Circle Size'
-        };
-
-        // Build landing page content using DOM methods (avoid innerHTML for security)
         const content = document.createElement('div');
         content.className = 'landing-content';
-
-        const icon = document.createElement('div');
-        icon.className = 'landing-icon';
-        // Create inline SVG using DOM methods (Power BI sandbox blocks data URLs for img src)
-        const svgNS = 'http://www.w3.org/2000/svg';
-        const iconSvg = document.createElementNS(svgNS, 'svg');
-        iconSvg.setAttribute('viewBox', MAPVIZ_LOGO_VIEWBOX);
-        iconSvg.setAttribute('width', '40');
-        iconSvg.setAttribute('height', '40');
-        iconSvg.setAttribute('aria-label', 'ROSEA MapViz');
-        // MAPVIZ logo paths (imported from src/assets/roseaLogo.ts)
-        MAPVIZ_LOGO_PATHS.forEach(d => {
-            const path = document.createElementNS(svgNS, 'path');
-            path.setAttribute('fill', MAPVIZ_LOGO_FILL);
-            path.setAttribute('d', d);
-            iconSvg.appendChild(path);
-        });
-        icon.appendChild(iconSvg);
+        content.appendChild(this.createLandingIcon());
 
         const title = document.createElement('h2');
-        title.textContent = strings.title;
+        title.textContent = ls?.getLandingTitle() || 'ROSEA MapViz';
 
         const description = document.createElement('p');
-        description.textContent = strings.description;
+        description.className = 'landing-description';
+        description.textContent = ls?.getLandingDescription() || 'Custom Power BI Visual for Humanitarian Maps';
 
         const instructions = document.createElement('div');
         instructions.className = 'landing-instructions';
 
         const instructionsTitle = document.createElement('h3');
-        instructionsTitle.textContent = strings.gettingStarted;
+        instructionsTitle.textContent = ls?.getLandingGettingStarted() || 'Getting Started';
+        instructions.appendChild(instructionsTitle);
+
+        const recipes = [
+            {
+                label: ls?.getLandingChoroplethMap() || 'Choropleth Map:',
+                hint: ls?.getLandingChoroplethInstructions() || 'Add Boundary ID and Choropleth Color fields',
+                fields: [
+                    roleName('Role_BoundaryID', 'Boundary ID'),
+                    roleName('Role_ChoroplethColor', 'Choropleth Color')
+                ]
+            },
+            {
+                label: ls?.getLandingScaledCircles() || 'Scaled Circles:',
+                hint: ls?.getLandingScaledCirclesInstructions() || 'Add Longitude, Latitude, and Circle Size fields',
+                fields: [
+                    roleName('Role_Longitude', 'Longitude'),
+                    roleName('Role_Latitude', 'Latitude'),
+                    roleName('Role_CircleSize', 'Circle Size')
+                ]
+            }
+        ];
 
         const list = document.createElement('ul');
-
-        const item1 = document.createElement('li');
-        const item1Strong = document.createElement('strong');
-        item1Strong.textContent = strings.choroplethMap;
-        const item1Text = document.createTextNode(' Add ');
-        const item1Em1 = document.createElement('em');
-        item1Em1.textContent = strings.boundaryId;
-        const item1Text2 = document.createTextNode(' and ');
-        const item1Em2 = document.createElement('em');
-        item1Em2.textContent = strings.choroplethColor;
-        const item1Text3 = document.createTextNode(' fields');
-        item1.appendChild(item1Strong);
-        item1.appendChild(item1Text);
-        item1.appendChild(item1Em1);
-        item1.appendChild(item1Text2);
-        item1.appendChild(item1Em2);
-        item1.appendChild(item1Text3);
-
-        const item2 = document.createElement('li');
-        const item2Strong = document.createElement('strong');
-        item2Strong.textContent = strings.scaledCircles;
-        const item2Text = document.createTextNode(' Add ');
-        const item2Em1 = document.createElement('em');
-        item2Em1.textContent = strings.longitude;
-        const item2Text2 = document.createTextNode(', ');
-        const item2Em2 = document.createElement('em');
-        item2Em2.textContent = strings.latitude;
-        const item2Text3 = document.createTextNode(', and ');
-        const item2Em3 = document.createElement('em');
-        item2Em3.textContent = strings.circleSize;
-        const item2Text4 = document.createTextNode(' fields');
-        item2.appendChild(item2Strong);
-        item2.appendChild(item2Text);
-        item2.appendChild(item2Em1);
-        item2.appendChild(item2Text2);
-        item2.appendChild(item2Em2);
-        item2.appendChild(item2Text3);
-        item2.appendChild(item2Em3);
-        item2.appendChild(item2Text4);
-
-        list.appendChild(item1);
-        list.appendChild(item2);
+        recipes.forEach(recipe => list.appendChild(this.createLandingRecipe(recipe)));
+        instructions.appendChild(list);
 
         const tip = document.createElement('p');
         tip.className = 'landing-tip';
-        tip.textContent = '💡 Tip: Configure basemap and styling in the Format pane';
-
-        instructions.appendChild(instructionsTitle);
-        instructions.appendChild(list);
+        tip.textContent = ls?.getLandingTip() || 'Tip: Configure basemap and styling in the Format pane';
         instructions.appendChild(tip);
 
-        content.appendChild(icon);
         content.appendChild(title);
         content.appendChild(description);
         content.appendChild(instructions);
 
         this.landingPage.appendChild(content);
         this.container.appendChild(this.landingPage);
+    }
+
+    /**
+     * Builds the inline logo shown on the landing page.
+     * Power BI's sandbox blocks data URLs for img src, so the logo is inlined as SVG.
+     */
+    private createLandingIcon(): HTMLElement {
+        const icon = document.createElement('div');
+        icon.className = 'landing-icon';
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const iconSvg = document.createElementNS(svgNS, 'svg');
+        iconSvg.setAttribute('viewBox', MAPVIZ_LOGO_VIEWBOX);
+        iconSvg.setAttribute('aria-label', 'ROSEA MapViz');
+        MAPVIZ_LOGO_PATHS.forEach(pathData => {
+            const path = document.createElementNS(svgNS, 'path');
+            path.setAttribute('fill', MAPVIZ_LOGO_FILL);
+            path.setAttribute('d', pathData);
+            iconSvg.appendChild(path);
+        });
+        icon.appendChild(iconSvg);
+        return icon;
+    }
+
+    /**
+     * Builds one "how to build this map" row: a localized sentence plus the
+     * data role names rendered as field chips.
+     */
+    private createLandingRecipe(recipe: { label: string; hint: string; fields: string[] }): HTMLLIElement {
+        const item = document.createElement('li');
+
+        const label = document.createElement('strong');
+        label.textContent = recipe.label;
+
+        const hint = document.createElement('span');
+        hint.className = 'landing-hint';
+        hint.textContent = recipe.hint;
+
+        const fields = document.createElement('span');
+        fields.className = 'landing-fields';
+        recipe.fields.forEach(fieldName => {
+            const chip = document.createElement('em');
+            chip.textContent = fieldName;
+            fields.appendChild(chip);
+        });
+
+        item.appendChild(label);
+        item.appendChild(hint);
+        item.appendChild(fields);
+        return item;
     }
 
     /**

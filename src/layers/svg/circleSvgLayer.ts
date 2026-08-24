@@ -1,4 +1,4 @@
-import { Layer } from 'ol/layer.js';
+import Layer from 'ol/layer/Layer.js';
 import { FrameState } from 'ol/Map';
 import { State } from 'ol/source/Source';
 import { transformExtent } from 'ol/proj.js';
@@ -7,8 +7,9 @@ import { arc as d3Arc } from 'd3-shape';
 import { CircleLayerOptions, GeoJSONFeature, CircleLabelOptions } from '../../types/index';
 import { DomIds } from "../../constants/strings";
 import { createWebMercatorProjection } from "../../utils/map";
-import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
+import { claimSharedOverlay, reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
 import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions, ScalingMethod, applyScaling } from "../../utils/h3Aggregation";
+import { toOlLayerOptions } from "../olLayerOptions";
 
 /**
  * SVG-based circle layer for rendering proportional symbols and pie/donut charts.
@@ -23,7 +24,7 @@ export class CircleSvgLayer extends Layer {
     private isActive: boolean = true;
 
     constructor(options: CircleLayerOptions) {
-        super({ ...options, zIndex: options.zIndex || 10 });
+        super(toOlLayerOptions(options));
 
         this.svg = options.svg;
         this.options = options;
@@ -103,7 +104,7 @@ export class CircleSvgLayer extends Layer {
         // H3 Hexbin mode: aggregate points and render hexagons
         if (isH3Hexbin) {
             this.renderH3Hexbins(frameState, d3Projection, width, height);
-            return this.options.svgContainer;
+            return claimSharedOverlay(frameState, this.options.svgContainer);
         }
 
         // Create SVG filter definitions for blur and glow effects
@@ -389,13 +390,7 @@ export class CircleSvgLayer extends Layer {
                         .datum(feature.properties.selectionId)
                         .style('cursor', 'pointer')
                         .style('pointer-events', 'all')
-                        .attr('fill-opacity', (d: any) => {
-                            if (this.selectedIds.length === 0) {
-                                return layer1Opacity;
-                            } else {
-                                return this.selectedIds.some(selectedId => selectedId === d) ? layer1Opacity : layer1Opacity / 2;
-                            }
-                        });
+                        .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, d, layer1Opacity));
 
                     // Second arc (value2)
                     const arc2 = circles2Group.append('path')
@@ -412,13 +407,7 @@ export class CircleSvgLayer extends Layer {
                         .datum(feature.properties.selectionId)
                         .style('cursor', 'pointer')
                         .style('pointer-events', 'all')
-                        .attr('fill-opacity', (d: any) => {
-                            if (this.selectedIds.length === 0) {
-                                return layer2Opacity;
-                            } else {
-                                return this.selectedIds.some(selectedId => selectedId === d) ? layer2Opacity : layer2Opacity / 2;
-                            }
-                        });
+                        .attr('fill-opacity', (d: any) => selectionOpacity(this.selectedIds, d, layer2Opacity));
 
                     // Tooltip for pie
                     if (feature.properties.tooltip) {
@@ -566,7 +555,7 @@ export class CircleSvgLayer extends Layer {
     reorderForCirclesAboveChoropleth(this.svg);
 
     // SVG is mounted once in visual.ts inside svgContainer
-        return this.options.svgContainer;
+        return claimSharedOverlay(frameState, this.options.svgContainer);
     }
 
     /**

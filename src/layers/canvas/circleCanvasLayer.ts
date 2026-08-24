@@ -1,4 +1,4 @@
-import { Layer } from 'ol/layer.js';
+import Layer from 'ol/layer/Layer.js';
 import { FrameState } from 'ol/Map';
 import { State } from 'ol/source/Source';
 import type { Extent } from 'ol/extent.js';
@@ -9,6 +9,7 @@ import { selectionOpacity } from '../../utils/graphics';
 import * as d3 from 'd3';
 import { createWebMercatorProjection } from '../../utils/map';
 import { aggregateToH3Hexbins, getHexbinColor, boundaryToLngLat, H3Hexbin, H3AggregationType, H3ColorRamp, H3ColorOptions, ScalingMethod, applyScaling } from '../../utils/h3Aggregation';
+import { toOlLayerOptions } from "../olLayerOptions";
 
 export class CircleCanvasLayer extends Layer {
   public options: CircleLayerOptions;
@@ -16,7 +17,7 @@ export class CircleCanvasLayer extends Layer {
   private isActive = true;
 
   constructor(options: CircleLayerOptions) {
-    super({ ...options, zIndex: options.zIndex || 10 });
+    super(toOlLayerOptions(options));
     this.options = options;
     this.changed();
   }

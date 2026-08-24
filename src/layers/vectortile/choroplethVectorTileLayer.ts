@@ -14,6 +14,7 @@ import ISelectionManager = powerbi.extensibility.ISelectionManager;
 import ISelectionId = powerbi.extensibility.ISelectionId;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+import { isSelectionIdSelected } from "../../utils/graphics";
 
 /**
  * Options for the ChoroplethVectorTileLayer.
@@ -551,9 +552,7 @@ export class ChoroplethVectorTileLayer extends VectorTileLayer {
         let opacity = this.options.fillOpacity;
         if (this.selectedIds.length > 0) {
             const selectionId = this.selectionIdLookup.get(idStr);
-            const isSelected = selectionId && this.selectedIds.some(
-                sel => (sel as any).key === (selectionId as any).key
-            );
+            const isSelected = isSelectionIdSelected(this.selectedIds, selectionId);
             opacity = isSelected ? this.options.fillOpacity : this.options.fillOpacity * 0.3;
         }
 

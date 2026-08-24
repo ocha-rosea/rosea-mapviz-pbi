@@ -1,4 +1,4 @@
-import { Layer } from 'ol/layer.js';
+import Layer from 'ol/layer/Layer.js';
 import { fromLonLat } from 'ol/proj.js';
 import { State } from 'ol/source/Source';
 import { ChoroplethLayerOptions, GeoJSONFeature, NestedGeometryStyle } from '../../types/index';
@@ -10,7 +10,8 @@ import { DomIds } from "../../constants/strings";
 // TopoJSON imports removed - simplification now handled by GeometrySimplificationService in orchestrator
 import ISelectionId = powerbi.visuals.ISelectionId;
 import { createWebMercatorProjection } from "../../utils/map";
-import { reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
+import { claimSharedOverlay, isSelectionIdSelected, reorderForCirclesAboveChoropleth, selectionOpacity, setSvgSize } from "../../utils/graphics";
+import { toOlLayerOptions } from "../olLayerOptions";
 
 const NO_DATA_COLOR = "rgba(0,0,0,0)";
 const isNoDataValue = (value: any): boolean => {
@@ -56,7 +57,7 @@ export class ChoroplethSvgLayer extends Layer {
     // TODO (Phase 4): Revisit zoom-level simplification for all engines
 
     constructor(options: ChoroplethLayerOptions) {
-        super({ ...options, zIndex: options.zIndex || 10 });
+        super(toOlLayerOptions(options));
 
         this.svg = options.svg;
         this.options = options;
@@ -138,9 +139,7 @@ export class ChoroplethSvgLayer extends Layer {
             let strokeWidth: number;
             
             const dataPoint = dataPointsLookup[pCode];
-            const isSelected = this.selectedIds.length > 0 && 
-                this.selectedIds.some(s => dataPoint?.selectionId && 
-                    (s as any).equals?.(dataPoint.selectionId) || s === dataPoint?.selectionId);
+            const isSelected = isSelectionIdSelected(this.selectedIds, dataPoint?.selectionId);
             
             if (this.options.isHighContrast && this.options.highContrastColors) {
                 // High contrast mode: use system colors
@@ -263,7 +262,7 @@ export class ChoroplethSvgLayer extends Layer {
 
     // SVG is mounted once in visual.ts inside svgContainer
 
-        return this.options.svgContainer;
+        return claimSharedOverlay(frameState, this.options.svgContainer);
     }
     
     /**

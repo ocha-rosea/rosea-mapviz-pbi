@@ -53,6 +53,7 @@ p {
     top: 10px;
     left: 48px;
     z-index: 10001;
+    display: flex;
     width: 28px;
     height: 28px;
     padding: 5px;
@@ -102,13 +103,20 @@ p {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     overflow: auto;
     box-sizing: border-box;
-    padding: 8px;
+    padding: 12px;
+    container-type: inline-size;
+
+    /* Sizes scale with the visual so the page reads well on a small tile and
+       on a full-page report alike. Static fallbacks come first for hosts
+       without container query support. */
+    --landing-base: 11px;
+    --landing-gap: 8px;
 
     .landing-content {
         text-align: center;
-        padding: 10px 12px;
-        max-width: 100%;
+        padding: calc(var(--landing-gap) * 1.5);
         width: 100%;
+        max-width: 460px;
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -116,86 +124,152 @@ p {
     }
 
     .landing-icon {
-        margin-bottom: 4px;
-        line-height: 1;
         display: flex;
         justify-content: center;
-        align-items: center;
-        
-        img {
-            width: 40px;
-            height: 40px;
+        margin-bottom: calc(var(--landing-gap) * 0.5);
+
+        svg {
+            width: calc(var(--landing-base) * 3);
+            height: calc(var(--landing-base) * 3);
             display: block;
-            object-fit: contain;
         }
     }
 
     h2 {
-        margin: 0 0 2px 0;
-        font-size: 14px;
+        margin: 0;
+        font-size: calc(var(--landing-base) * 1.3);
         font-weight: 600;
         color: #323130;
     }
 
-    p {
-        font-size: 10px;
-        font-weight: normal;
+    .landing-description {
+        font-size: calc(var(--landing-base) * 0.92);
         color: #605e5c;
-        margin: 0 0 8px 0;
-        line-height: 1.3;
-        
-        em {
-            background: transparent;
-            padding: 0;
-            font-style: italic;
-        }
+        margin: 2px 0 var(--landing-gap) 0;
+        line-height: 1.35;
     }
 
     .landing-instructions {
         text-align: left;
         background: #f8f9fa;
-        padding: 8px 10px;
+        padding: var(--landing-gap);
         border-radius: 6px;
 
         h3 {
-            margin: 0 0 6px 0;
-            font-size: 11px;
+            margin: 0 0 calc(var(--landing-gap) * 0.75) 0;
+            font-size: var(--landing-base);
             font-weight: 600;
             color: #323130;
         }
 
         ul {
             margin: 0;
-            padding-left: 16px;
-            
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: calc(var(--landing-gap) * 0.75);
+
             li {
-                margin-bottom: 4px;
-                font-size: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+                font-size: calc(var(--landing-base) * 0.92);
                 color: #605e5c;
-                line-height: 1.2;
-                
+                line-height: 1.3;
+                padding-left: var(--landing-gap);
+                border-left: 2px solid #0078d4;
+
                 strong {
                     color: #323130;
-                }
-                
-                em {
-                    background: #e8f4f8;
-                    padding: 1px 4px;
-                    border-radius: 3px;
-                    font-style: normal;
-                    font-size: 10px;
-                    color: #0078d4;
+                    font-weight: 600;
                 }
             }
         }
 
+        .landing-hint {
+            color: #605e5c;
+        }
+
+        .landing-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+
+            em {
+                background: #e8f4f8;
+                padding: 1px 6px;
+                border-radius: 3px;
+                font-style: normal;
+                color: #0078d4;
+                white-space: nowrap;
+            }
+        }
+
         .landing-tip {
-            margin: 6px 0 0 0;
-            padding: 4px 6px;
+            margin: var(--landing-gap) 0 0 0;
+            padding: calc(var(--landing-gap) * 0.5);
             background: #fff4ce;
             border-radius: 4px;
-            font-size: 9px;
+            font-size: calc(var(--landing-base) * 0.85);
             color: #665c00;
+            line-height: 1.3;
+        }
+    }
+}
+
+/* Compact tiles: drop the supporting prose and keep the field chips. */
+@container (max-width: 260px) {
+    .rosea-landing-page {
+        --landing-base: 10px;
+        --landing-gap: 6px;
+
+        .landing-description,
+        .landing-hint,
+        .landing-tip {
+            display: none;
+        }
+    }
+}
+
+@container (min-width: 520px) {
+    .rosea-landing-page {
+        --landing-base: 14px;
+        --landing-gap: 12px;
+    }
+}
+
+/* Honour Windows / Power BI high contrast themes. */
+@media (forced-colors: active) {
+    .rosea-landing-page {
+        background: Canvas;
+
+        .landing-content,
+        .landing-instructions,
+        .landing-tip {
+            background: Canvas;
+            border: 1px solid CanvasText;
+            box-shadow: none;
+        }
+
+        h2,
+        h3,
+        .landing-description,
+        .landing-hint,
+        .landing-tip,
+        li,
+        strong {
+            color: CanvasText;
+        }
+
+        .landing-fields em {
+            background: Canvas;
+            border: 1px solid LinkText;
+            color: LinkText;
+        }
+
+        .landing-icon svg path {
+            fill: CanvasText;
         }
     }
 }

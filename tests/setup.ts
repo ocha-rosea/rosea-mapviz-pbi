@@ -23,6 +23,16 @@ global.powerbi = {
   DataViewCategorical: {} as any,
 } as any;
 
+// jsdom 22 does not expose TextEncoder/TextDecoder, which some OpenLayers
+// modules touch at import time. Browsers provide both natively.
+import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'util';
+if (typeof (global as any).TextEncoder === 'undefined') {
+  (global as any).TextEncoder = NodeTextEncoder;
+}
+if (typeof (global as any).TextDecoder === 'undefined') {
+  (global as any).TextDecoder = NodeTextDecoder;
+}
+
 // Mock DOM APIs for OpenLayers
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

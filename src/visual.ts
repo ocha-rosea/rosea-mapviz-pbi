@@ -214,7 +214,8 @@ export class RoseaMapViz implements IVisual {
 
     private updateExportButtonVisibility(): void {
         const elements = this.domManager.getElements();
-        elements.exportButton.style.display = this.mapToolsOptions?.showExportButton === false ? "none" : "flex";
+        // Empty string restores the stylesheet value rather than hard-coding the layout here.
+        elements.exportButton.style.display = this.mapToolsOptions?.showExportButton === false ? "none" : "";
     }
 
     private getExportStatusWarning(status: powerbi.PrivilegeStatus): string {
@@ -412,7 +413,7 @@ export class RoseaMapViz implements IVisual {
             basemapSettingGroups.maptilerSettingsGroup.maptilerApiKey.visible = !maptilerCredential;
 
             // Clean up previous overlay graphics (never touch base map layer stack here)
-            this.svg.selectAll('*').remove();
+            this.domManager.clearOverlayGroups();
             elements.svgOverlay.style.display = 'none';
 
             // Build option objects
@@ -461,7 +462,7 @@ export class RoseaMapViz implements IVisual {
             // No data -> clear overlays, show landing page, keep basemap visible
             if (!dataView || !dataView.categorical) {
                 this.choroplethOrchestrator.cancelPendingRender();
-                this.svg.selectAll('*').remove();
+                this.domManager.clearOverlayGroups();
                 this.domManager.setLegendVisible(false);
                 this.domManager.showLandingPage();
                 return; // finally will fire
@@ -632,7 +633,6 @@ export class RoseaMapViz implements IVisual {
     public destroy(): void {
         this.choroplethOrchestrator?.cancelPendingRender?.();
         this.map.setTarget(null);
-        this.svg.selectAll('*').remove();
         this.domManager.dispose();
     }
 }
