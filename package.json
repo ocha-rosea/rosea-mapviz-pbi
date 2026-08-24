@@ -48,6 +48,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.3",
     "@babel/preset-env": "^7.25.8",
+    "@types/geojson": "^7946.0.16",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.1.0",
     "@typescript-eslint/eslint-plugin": "^8.19.1",
